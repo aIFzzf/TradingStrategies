@@ -1,4 +1,4 @@
-name: 分析纳斯达克前100股票
+name: 分析纳斯达克前100股票（新）
 
 on:
   schedule:
@@ -32,7 +32,8 @@ jobs:
         run: python scripts/analysis/get_nasdaq_top100.py
         
       - name: 分析股票
-        run: python scripts/analysis/batch_analyze_stocks.py --signal_only --output data/csv/nasdaq100_analysis.csv          
+        run: python scripts/analysis/batch_analyze_stocks.py --signal_only --output data/csv/nasdaq100_analysis.csv
+          
       - name: 提交分析结果到仓库
         run: |
           git config --global user.name "GitHub Actions Bot"
