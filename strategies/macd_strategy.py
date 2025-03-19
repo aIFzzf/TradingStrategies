@@ -8,6 +8,7 @@ MACD交易策略
 import pandas as pd
 import numpy as np
 from backtesting import Strategy
+from common.indicators import MACD
 
 
 class MACDStrategy(Strategy):
@@ -35,7 +36,7 @@ class MACDStrategy(Strategy):
         
         # 计算MACD指标
         self.macd_line, self.signal_line, self.histogram = self.I(
-            self.MACD, close, self.fast_period, self.slow_period, self.signal_period
+            MACD, close, self.fast_period, self.slow_period, self.signal_period
         )
     
     def next(self):
@@ -58,37 +59,3 @@ class MACDStrategy(Strategy):
             # 当MACD线下穿信号线时卖出（死叉）
             if self.macd_line[-2] > self.signal_line[-2] and self.macd_line[-1] < self.signal_line[-1]:
                 self.position.close()
-    
-    @staticmethod
-    def MACD(values, fast_period, slow_period, signal_period):
-        """
-        计算MACD指标
-        
-        参数:
-        - values: 价格序列
-        - fast_period: 快速EMA周期
-        - slow_period: 慢速EMA周期
-        - signal_period: 信号线周期
-        
-        返回:
-        - macd_line: MACD线 (快速EMA - 慢速EMA)
-        - signal_line: 信号线 (MACD的EMA)
-        - histogram: 柱状图 (MACD线 - 信号线)
-        """
-        # 转换为pandas Series
-        close = pd.Series(values)
-        
-        # 计算快速和慢速EMA
-        fast_ema = close.ewm(span=fast_period, adjust=False).mean()
-        slow_ema = close.ewm(span=slow_period, adjust=False).mean()
-        
-        # 计算MACD线
-        macd_line = fast_ema - slow_ema
-        
-        # 计算信号线
-        signal_line = macd_line.ewm(span=signal_period, adjust=False).mean()
-        
-        # 计算柱状图
-        histogram = macd_line - signal_line
-        
-        return macd_line, signal_line, histogram

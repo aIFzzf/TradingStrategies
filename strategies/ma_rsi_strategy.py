@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from backtesting import Strategy
 from backtesting.lib import crossover, TrailingStrategy
+from common.indicators import SMA, RSI
 
 
 class MACrossRSI(TrailingStrategy):
@@ -41,11 +42,11 @@ class MACrossRSI(TrailingStrategy):
         price = self.data.Close
         
         # 计算移动平均线
-        self.fast_ma_line = self.I(self.SMA, price, self.fast_ma)
-        self.slow_ma_line = self.I(self.SMA, price, self.slow_ma)
+        self.fast_ma_line = self.I(SMA, price, self.fast_ma)
+        self.slow_ma_line = self.I(SMA, price, self.slow_ma)
         
         # 计算RSI指标
-        self.rsi = self.I(self.RSI, price, self.rsi_period)
+        self.rsi = self.I(RSI, price, self.rsi_period)
         
         # 设置跟踪止损
         self.set_trailing_sl(self.trailing_sl_atr)
@@ -66,42 +67,3 @@ class MACrossRSI(TrailingStrategy):
             # 卖出条件：短期均线下穿长期均线 OR RSI > rsi_sell_threshold (超买)
             if crossover(self.slow_ma_line, self.fast_ma_line) or self.rsi[-1] > self.rsi_sell_threshold:
                 self.position.close()
-    
-    @staticmethod
-    def SMA(values, n):
-        """计算简单移动平均线"""
-        return pd.Series(values).rolling(n).mean()
-    
-    @staticmethod
-    def RSI(values, n):
-        """
-        计算相对强弱指数 (RSI)
-        
-        参数:
-        - values: 价格序列
-        - n: 周期
-        
-        返回:
-        - RSI值序列 (0-100)
-        """
-        # 转换为pandas Series
-        close = pd.Series(values)
-        
-        # 计算价格变化
-        delta = close.diff()
-        
-        # 分离上涨和下跌
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-        
-        # 计算平均上涨和下跌
-        avg_gain = gain.rolling(window=n).mean()
-        avg_loss = loss.rolling(window=n).mean()
-        
-        # 计算相对强度 (RS)
-        rs = avg_gain / avg_loss
-        
-        # 计算RSI
-        rsi = 100 - (100 / (1 + rs))
-        
-        return rsi

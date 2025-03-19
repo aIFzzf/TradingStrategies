@@ -12,12 +12,25 @@ TradingStrategies/
 │   ├── ma_rsi_strategy.py   # 均线+RSI策略
 │   ├── bollinger_strategy.py # 布林带策略
 │   ├── macd_strategy.py     # MACD策略
-│   └── multi_timeframe_strategy.py # 多周期策略
+│   ├── multi_timeframe_strategy.py # 多周期策略
+│   ├── long_term_macd_strategy.py # 长期MACD策略
+│   ├── multi_tf_strategy.py # 多周期组合策略
+│   └── ...
 ├── common/               # 公共工具模块
 │   ├── __init__.py          # 模块初始化文件
+│   ├── indicators.py        # 技术指标计算工具
 │   └── timeframe_utils.py   # 时间周期转换工具
+├── scripts/              # 脚本目录
+│   ├── analysis/            # 分析脚本
+│       ├── get_nasdaq_top100.py  # 获取纳斯达克前100股票
+│       └── batch_analyze_stocks.py # 批量分析股票
+├── .github/              # GitHub相关配置
+│   └── workflows/           # GitHub Actions工作流
+│       └── analyze_stocks.yml  # 自动分析股票工作流
 ├── backtest_engine.py       # 回测引擎
 ├── run_strategy.py          # 运行策略的命令行工具
+├── run_long_term_strategy.py # 运行长期MACD策略
+├── run_interactive_chart.py # 运行交互式图表
 ├── custom_data_example.py   # 使用自定义数据的示例
 └── README.md                # 项目说明文档
 ```
@@ -51,6 +64,9 @@ python run_strategy.py --symbol AAPL --start 2020-01-01 --end 2023-12-31 --strat
 # 运行多周期组合策略
 python run_strategy.py --symbol AAPL --start 2020-01-01 --end 2023-12-31 --strategy multi_tf_strategy
 
+# 运行长期MACD策略
+python run_long_term_strategy.py --symbol AAPL --start 2018-01-01 --end 2023-12-31
+
 # 使用不同的时间周期（周线、月线）
 python run_strategy.py --symbol AAPL --start 2018-01-01 --end 2023-12-31 --strategy dual_ma --interval 1wk
 python run_strategy.py --symbol MSFT --start 2015-01-01 --end 2023-12-31 --strategy macd --interval 1mo
@@ -68,7 +84,7 @@ python run_strategy.py --symbol AAPL --start 2020-01-01 --end 2023-12-31 --strat
 ### 在代码中使用
 
 ```python
-from strategies import DualMAStrategy, MACrossRSI, BollingerBandStrategy, MACDStrategy, MultiTimeframeStrategy, MultiTFStrategy
+from strategies import DualMAStrategy, MACrossRSI, BollingerBandStrategy, MACDStrategy, MultiTimeframeStrategy, MultiTFStrategy, LongTermMACDStrategy
 from backtest_engine import get_stock_data, run_backtest, resample_data
 
 # 获取数据
@@ -99,10 +115,50 @@ stats4, bt4 = run_backtest(data, MultiTimeframeStrategy, weekly_fast_ma=10, week
 # 运行多周期组合策略回测（使用日线数据）
 stats5, bt5 = run_backtest(data, MultiTFStrategy, short_ma=5, long_ma=20, signal_ma=10)
 
+# 运行长期MACD策略回测（使用日线数据）
+stats6, bt6 = run_backtest(data, LongTermMACDStrategy, fast_period=12, slow_period=26, signal_period=9)
+
 # 显示结果
 print(stats1)
 bt1.plot()
 ```
+
+## 批量分析股票
+
+本项目提供了批量分析股票的功能，可以自动获取纳斯达克前100的股票并应用交易策略进行分析。
+
+### 获取纳斯达克前100股票
+
+```bash
+python scripts/analysis/get_nasdaq_top100.py
+```
+
+这将获取纳斯达克100指数的成分股列表，并保存到`nasdaq100_symbols.json`文件中。
+
+### 批量分析股票
+
+```bash
+# 分析所有股票
+python scripts/analysis/batch_analyze_stocks.py --output nasdaq100_analysis.csv
+
+# 只输出有买入信号的股票
+python scripts/analysis/batch_analyze_stocks.py --signal_only --output nasdaq100_analysis.csv
+
+# 自定义参数
+python scripts/analysis/batch_analyze_stocks.py --start 2018-01-01 --end 2023-12-31 --max_workers 10 --signal_only
+```
+
+### GitHub自动化流水线
+
+本项目配置了GitHub Actions工作流，可以自动化运行股票分析：
+
+1. 每周一自动运行（也可以手动触发）
+2. 获取纳斯达克前100股票
+3. 运行策略分析
+4. 保存分析结果
+5. 将结果提交回仓库
+
+工作流配置文件位于`.github/workflows/analyze_stocks.yml`。
 
 ## 多周期组合策略
 
@@ -189,171 +245,117 @@ python run_strategy.py --symbol AAPL --interval 1wk --strategy dual_ma
 
 项目包含一个`common`模块，提供了各种可复用的工具函数：
 
-### 时间周期转换工具
-
-`common.timeframe_utils`模块提供了以下功能：
-
-- **resample_to_weekly**: 将日线数据重采样为周线数据
-- **resample_to_monthly**: 将日线数据重采样为月线数据
-- **resample_to_timeframe**: 将数据重采样为指定的时间周期
-- **map_higher_timeframe_to_daily**: 将高周期数据映射到日线数据
-- **calculate_ma**: 计算移动平均线
-- **get_timeframe_data**: 获取指定时间周期的数据
-- **align_timeframes**: 将不同周期的数据对齐到日线时间轴
-
-使用示例：
+### 技术指标计算 (indicators.py)
 
 ```python
-from common.timeframe_utils import resample_to_weekly, calculate_ma, align_timeframes
+from common.indicators import SMA, EMA, RSI, MACD, BollingerBands, ATR, STOCH
 
-# 获取日线数据
-daily_data = get_stock_data('AAPL', '2020-01-01', '2023-12-31')
+# 计算简单移动平均线
+sma = SMA(daily_data, 20)
 
-# 转换为周线数据
+# 计算指数移动平均线
+ema = EMA(daily_data, 20)
+
+# 计算相对强弱指数
+rsi = RSI(daily_data, 14)
+
+# 计算MACD指标
+dif, dea, macd = MACD(daily_data, 12, 26, 9)
+
+# 计算布林带
+upper, middle, lower = BollingerBands(daily_data, 20, 2)
+
+# 计算真实波动幅度均值
+atr = ATR(daily_data, 14)
+
+# 计算随机指标(KD)
+stoch = STOCH(daily_data, 14, 3, 3)
+```
+
+### 时间周期转换 (timeframe_utils.py)
+
+```python
+from common.timeframe_utils import resample_to_weekly, resample_to_monthly, resample_to_timeframe, map_higher_timeframe_to_daily
+
+# 将日线数据重采样为周线
 weekly_data = resample_to_weekly(daily_data)
 
-# 计算不同周期的均线
-daily_ma = calculate_ma(daily_data, 20)
-weekly_ma = calculate_ma(weekly_data, 10)
+# 将日线数据重采样为月线
+monthly_data = resample_to_monthly(daily_data)
 
-# 将不同周期的数据对齐到日线时间轴
-aligned_data = align_timeframes(daily_data, weekly_data=weekly_data)
+# 使用通用函数重采样为任意周期
+weekly_data = resample_to_timeframe(daily_data, 'W')  # 周线
+monthly_data = resample_to_timeframe(daily_data, 'M')  # 月线
+quarterly_data = resample_to_timeframe(daily_data, 'Q')  # 季线
+yearly_data = resample_to_timeframe(daily_data, 'Y')  # 年线
+
+# 将高周期数据映射回日线周期（用于在日线图表上显示高周期指标）
+weekly_sma_daily = map_higher_timeframe_to_daily(weekly_sma, daily_data.index)
 ```
-
-## 如何使用多周期工具
-
-本项目提供了强大的多周期工具，可以帮助您在策略中结合不同时间周期的数据进行交易决策。以下是一些使用示例：
-
-### 1. 在策略中使用多周期数据
-
-```python
-from common.timeframe_utils import resample_to_weekly, resample_to_monthly, calculate_ma, map_higher_timeframe_to_daily
-
-class MyMultiTimeframeStrategy(Strategy):
-    def init(self):
-        # 获取周线和月线数据
-        self.weekly_data = resample_to_weekly(self.data.df.copy())
-        self.monthly_data = resample_to_monthly(self.data.df.copy())
-        
-        # 计算不同周期的指标
-        self.weekly_ma = calculate_ma(self.weekly_data, 10)
-        self.monthly_ma = calculate_ma(self.monthly_data, 6)
-        
-        # 将高周期数据映射到日线时间轴
-        self.weekly_ma_daily = self.I(map_higher_timeframe_to_daily, self.data.df, self.weekly_ma)
-        self.monthly_ma_daily = self.I(map_higher_timeframe_to_daily, self.data.df, self.monthly_ma)
-    
-    def next(self):
-        # 使用不同周期的指标进行交易决策
-        if not self.position:
-            # 月线趋势向上 + 周线金叉
-            if (self.data.Close[-1] > self.monthly_ma_daily[-1] and 
-                self.weekly_ma_daily[-1] > self.weekly_ma_daily[-2]):
-                self.buy()
-```
-
-### 2. 在回测脚本中使用多周期数据
-
-```python
-from common.timeframe_utils import get_timeframe_data, align_timeframes
-
-# 获取不同周期的数据
-daily_data = get_stock_data('AAPL', '2020-01-01', '2023-12-31', interval='1d')
-weekly_data = get_timeframe_data('AAPL', '2020-01-01', '2023-12-31', interval='1wk')
-monthly_data = get_timeframe_data('AAPL', '2020-01-01', '2023-12-31', interval='1mo')
-
-# 将不同周期的数据对齐到日线时间轴
-aligned_data = align_timeframes(daily_data, 
-                               weekly_data=weekly_data, 
-                               monthly_data=monthly_data)
-
-# 现在可以在日线时间轴上访问不同周期的数据
-print(aligned_data['daily']['Close'])
-print(aligned_data['weekly']['Close'])
-print(aligned_data['monthly']['Close'])
-```
-
-### 3. 自定义周期转换
-
-```python
-from common.timeframe_utils import resample_to_timeframe
-
-# 创建自定义周期的数据
-biweekly_data = resample_to_timeframe(daily_data, '2W')  # 两周数据
-quarterly_data = resample_to_timeframe(daily_data, 'Q')  # 季度数据
-```
-
-通过使用这些工具，您可以轻松地在策略中结合不同时间周期的数据，创建更加复杂和有效的交易策略。
 
 ## 策略说明
 
 ### 1. 双均线策略 (DualMAStrategy)
 
-经典的双均线交叉策略：
-- 当短期均线上穿长期均线时买入
-- 当短期均线下穿长期均线时卖出
-- 支持止损和止盈设置
+双均线策略使用快速和慢速移动平均线的交叉点作为交易信号：
 
-参数：
-- `fast_ma`: 短期均线周期
-- `slow_ma`: 长期均线周期
-- `stop_loss_pct`: 止损百分比
-- `take_profit_pct`: 止盈百分比
+- 当快速均线上穿慢速均线时买入
+- 当快速均线下穿慢速均线时卖出
+
+```bash
+python run_strategy.py --symbol AAPL --strategy dual_ma --fast_ma 10 --slow_ma 30
+```
 
 ### 2. 均线+RSI策略 (MACrossRSI)
 
-结合均线和RSI指标的高级策略：
-- 买入条件：短期均线上穿长期均线 AND RSI < 阈值(非超买)
-- 卖出条件：短期均线下穿长期均线 OR RSI > 阈值(超买)
-- 使用跟踪止损保护利润
+结合均线交叉和RSI指标的策略：
 
-参数：
-- `fast_ma`: 短期均线周期
-- `slow_ma`: 长期均线周期
-- `rsi_period`: RSI计算周期
-- `rsi_buy_threshold`: RSI买入阈值
-- `rsi_sell_threshold`: RSI卖出阈值
-- `trailing_sl_atr`: 跟踪止损的ATR倍数
+- 当快速均线上穿慢速均线且RSI>50时买入
+- 当快速均线下穿慢速均线或RSI<30时卖出
+
+```bash
+python run_strategy.py --symbol MSFT --strategy ma_rsi --fast_ma 10 --slow_ma 30 --rsi_period 14
+```
 
 ### 3. 布林带策略 (BollingerBandStrategy)
 
-基于布林带的交易策略：
-- 买入条件：价格触及布林带下轨
-- 卖出条件：价格触及布林带上轨
-- 支持止损设置
+基于布林带的策略：
 
-参数：
-- `bb_period`: 布林带计算周期
-- `bb_std`: 布林带标准差倍数
-- `stop_loss_pct`: 止损百分比
+- 当价格突破下轨且RSI<30时买入
+- 当价格突破上轨或RSI>70时卖出
+
+```bash
+python run_strategy.py --symbol GOOG --strategy bollinger --bb_period 20 --bb_std 2.0
+```
 
 ### 4. MACD策略 (MACDStrategy)
 
-基于MACD指标的交易策略：
-- 买入条件：MACD线上穿信号线（金叉）
-- 卖出条件：MACD线下穿信号线（死叉）
-- 支持止损和止盈设置
+基于MACD指标的策略：
 
-参数：
-- `fast_period`: MACD快线周期
-- `slow_period`: MACD慢线周期
-- `signal_period`: MACD信号线周期
-- `stop_loss_pct`: 止损百分比
-- `take_profit_pct`: 止盈百分比
+- 当MACD金叉（DIF上穿DEA）时买入
+- 当MACD死叉（DIF下穿DEA）时卖出
 
-### 5. 多周期策略 (MultiTimeframeStrategy)
+```bash
+python run_strategy.py --symbol TSLA --strategy macd --fast_period 12 --slow_period 26 --signal_period 9
+```
 
-多周期策略结合了周线和月线数据进行交易决策：
+### 5. 长期MACD策略 (LongTermMACDStrategy)
 
-- **月线**：确定大趋势方向（价格在月线均线之上为上升趋势）
-- **周线**：寻找入场点（短期均线上穿长期均线为买入信号）
+使用月线、周线和日线的MACD指标进行多周期共振分析，寻找长期趋势的买卖点：
 
-参数：
-- `weekly_fast_ma`: 周线短期均线周期
-- `weekly_slow_ma`: 周线长期均线周期
-- `monthly_ma`: 月线均线周期
-- `stop_loss_pct`: 止损百分比
-- `take_profit_pct`: 止盈百分比
+- 买入条件：
+  1. 月线KDJ金叉
+  2. 月线MACD DIF斜率向上
+  3. 周线MACD金叉
+  4. 日线K线向上突破EMA20均线或日线MACD金叉
+
+- 卖出条件：
+  1. 月线MACD值下降
+  2. 周线MACD死叉且MACD值<0
+
+```bash
+python run_long_term_strategy.py --symbol AAPL --start 2018-01-01 --end 2023-12-31
+```
 
 **注意**：多周期策略需要使用日线数据作为输入，策略内部会自动将其转换为周线和月线数据。策略使用了`common.timeframe_utils`模块中的工具函数进行时间周期转换。
 
@@ -361,58 +363,50 @@ quarterly_data = resample_to_timeframe(daily_data, 'Q')  # 季度数据
 
 多周期组合策略结合了短期和长期均线进行交易决策：
 
-- **短期均线**：寻找入场点（短期均线上穿长期均线为买入信号）
-- **长期均线**：确定大趋势方向（价格在长期均线之上为上升趋势）
+- 买入条件：
+  1. 短期均线上穿长期均线
+  2. 信号均线向上
+  3. 价格位于长期均线之上
 
-参数：
-- `short_ma`: 短期均线周期
-- `long_ma`: 长期均线周期
-- `signal_ma`: 信号线周期
-- `stop_loss_pct`: 止损百分比
-- `take_profit_pct`: 止盈百分比
+- 卖出条件：
+  1. 短期均线下穿长期均线
+  2. 信号均线向下
+  3. 价格位于长期均线之下
 
-**注意**：多周期策略需要使用日线数据作为输入，策略内部会自动将其转换为周线和月线数据。
-
-## 扩展策略
-
-要添加新的策略，请按照以下步骤操作：
-
-1. 在 `strategies` 目录下创建新的策略文件，例如 `my_strategy.py`
-2. 实现策略类，继承自 `Strategy` 或其他基类
-3. 在 `strategies/__init__.py` 中导入并导出新策略
-4. 在 `run_strategy.py` 中添加相应的命令行选项和处理逻辑
-
-示例：
-```python
-# strategies/my_strategy.py
-from backtesting import Strategy
-
-class MyStrategy(Strategy):
-    # 实现策略逻辑
-    ...
-
-# strategies/__init__.py
-from .my_strategy import MyStrategy
-__all__ = ['DualMAStrategy', 'MACrossRSI', 'BollingerBandStrategy', 'MACDStrategy', 'MultiTimeframeStrategy', 'MultiTFStrategy', 'MyStrategy']
-
+```bash
+python run_strategy.py --symbol AAPL --strategy multi_tf_strategy --short_ma 5 --long_ma 20 --signal_ma 10
 ```
 
-## 回测结果解释
+## 自定义数据
 
-回测完成后，将显示以下主要指标：
+除了使用Yahoo Finance的数据外，本框架还支持使用自定义数据源：
 
-- **Return [%]**: 总回报率
-- **Buy & Hold Return [%]**: 买入持有策略的回报率
-- **Max. Drawdown [%]**: 最大回撤百分比
-- **# Trades**: 交易次数
-- **Win Rate [%]**: 盈利交易的百分比
-- **Sharpe Ratio**: 夏普比率，衡量风险调整后的回报
-- **Sortino Ratio**: 索提诺比率，只考虑下行风险
-- **Calmar Ratio**: 卡玛比率，回报与最大回撤的比值
+```python
+# 加载自定义CSV数据
+custom_data = pd.read_csv('my_stock_data.csv', index_col='Date', parse_dates=True)
 
-## 注意事项
+# 确保数据包含必要的列：Open, High, Low, Close, Volume
+required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+for col in required_columns:
+    if col not in custom_data.columns:
+        raise ValueError(f"自定义数据缺少必要的列: {col}")
 
-- 过去的表现不代表未来的结果
-- 回测结果可能受到过拟合的影响
-- 实际交易中还需考虑滑点、流动性等因素
-- 建议在实盘交易前进行充分的测试和风险评估
+# 运行回测
+stats, bt = run_backtest(custom_data, DualMAStrategy)
+```
+
+示例代码见`custom_data_example.py`。
+
+## 贡献指南
+
+欢迎贡献新的策略或改进现有功能！请遵循以下步骤：
+
+1. Fork本仓库
+2. 创建新分支 (`git checkout -b feature/your-feature`)
+3. 提交更改 (`git commit -m 'Add some feature'`)
+4. 推送到分支 (`git push origin feature/your-feature`)
+5. 创建Pull Request
+
+## 许可证
+
+本项目采用MIT许可证。详情请参阅LICENSE文件。

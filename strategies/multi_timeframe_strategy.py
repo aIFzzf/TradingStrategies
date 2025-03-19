@@ -11,9 +11,9 @@ from backtesting import Strategy
 from common.timeframe_utils import (
     resample_to_weekly,
     resample_to_monthly,
-    calculate_ma,
     map_higher_timeframe_to_daily
 )
+from common.indicators import calculate_ma
 
 
 class MultiTimeframeStrategy(Strategy):

@@ -8,12 +8,14 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 from backtesting import Backtest
 from common.timeframe_utils import resample_to_timeframe
 from strategies import DualMAStrategy, MACrossRSI
+import os
 
 
-def get_stock_data(symbol, start_date, end_date, interval='1d'):
+def get_stock_data(symbol, start_date, end_date, interval='1d', max_retries=3, retry_delay=2, use_cache=True, cache_dir='data_cache'):
     """
     获取股票数据
     
@@ -22,20 +24,67 @@ def get_stock_data(symbol, start_date, end_date, interval='1d'):
     - start_date: 开始日期
     - end_date: 结束日期
     - interval: 数据周期，可选值：'1d'(日线), '1wk'(周线), '1mo'(月线)
+    - max_retries: 最大重试次数
+    - retry_delay: 重试延迟（秒）
+    - use_cache: 是否使用缓存
+    - cache_dir: 缓存目录
     
     返回:
     - DataFrame: 股票数据
     """
-    data = yf.download(symbol, start=start_date, end=end_date, interval=interval)
+    # 创建缓存目录（如果不存在）
+    if use_cache and not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
     
-    if data.empty:
-        raise ValueError(f"无法获取股票数据: {symbol}")
+    # 构建缓存文件路径
+    cache_file = os.path.join(cache_dir, f"{symbol}_{start_date}_{end_date}_{interval}.csv")
     
-    # 处理可能的多级索引列
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = data.columns.get_level_values(0)
+    # 如果使用缓存且缓存文件存在，则从缓存加载数据
+    if use_cache and os.path.exists(cache_file):
+        try:
+            print(f"从缓存加载 {symbol} 的数据...")
+            data = pd.read_csv(cache_file, index_col=0, parse_dates=True)
+            if not data.empty:
+                print(f"成功从缓存加载数据，共 {len(data)} 条记录")
+                return data
+            print("缓存数据为空，将重新获取数据")
+        except Exception as e:
+            print(f"读取缓存文件出错: {e}，将重新获取数据")
     
-    return data
+    # 如果没有使用缓存或缓存加载失败，则从网络获取数据
+    for attempt in range(max_retries):
+        try:
+            print(f"从Yahoo Finance获取 {symbol} 的数据...")
+            data = yf.download(symbol, start=start_date, end=end_date, interval=interval)
+            
+            if data.empty:
+                if attempt < max_retries - 1:
+                    print(f"获取数据失败，{retry_delay}秒后重试...")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    raise ValueError(f"无法获取股票数据: {symbol}")
+            
+            # 处理可能的多级索引列
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = data.columns.get_level_values(0)
+            
+            # 如果使用缓存，则保存数据到缓存文件
+            if use_cache:
+                try:
+                    data.to_csv(cache_file)
+                    print(f"数据已保存到缓存文件: {cache_file}")
+                except Exception as e:
+                    print(f"保存缓存文件出错: {e}")
+            
+            return data
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"获取数据时出错: {e}，{retry_delay}秒后重试...")
+                time.sleep(retry_delay)
+            else:
+                print(f"获取数据失败，已达到最大重试次数: {e}")
+                raise
 
 
 def resample_data(data, interval='W'):

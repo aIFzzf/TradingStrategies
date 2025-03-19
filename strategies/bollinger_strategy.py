@@ -8,6 +8,7 @@
 import pandas as pd
 import numpy as np
 from backtesting import Strategy
+from common.indicators import SMA, BBANDS
 
 
 class BollingerBandStrategy(Strategy):
@@ -30,9 +31,9 @@ class BollingerBandStrategy(Strategy):
         close = self.data.Close
         
         # 计算布林带
-        self.sma = self.I(self.SMA, close, self.bb_period)
-        self.upper = self.I(self.upper_band, close, self.sma, self.bb_std)
-        self.lower = self.I(self.lower_band, close, self.sma, self.bb_std)
+        upper, self.sma, lower = self.I(BBANDS, close, self.bb_period, self.bb_std)
+        self.upper = upper
+        self.lower = lower
     
     def next(self):
         """每个新的K线数据到来时执行的逻辑"""
@@ -53,20 +54,3 @@ class BollingerBandStrategy(Strategy):
             # 当价格触及上轨时卖出
             if price >= self.upper[-1]:
                 self.position.close()
-    
-    @staticmethod
-    def SMA(values, n):
-        """计算简单移动平均线"""
-        return pd.Series(values).rolling(n).mean()
-    
-    @staticmethod
-    def upper_band(values, sma, std_dev):
-        """计算布林带上轨"""
-        std = pd.Series(values).rolling(len(sma)).std()
-        return sma + std_dev * std
-    
-    @staticmethod
-    def lower_band(values, sma, std_dev):
-        """计算布林带下轨"""
-        std = pd.Series(values).rolling(len(sma)).std()
-        return sma - std_dev * std

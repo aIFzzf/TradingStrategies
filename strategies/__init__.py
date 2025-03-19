@@ -8,5 +8,6 @@ from .ma_rsi_strategy import MACrossRSI
 from .bollinger_strategy import BollingerBandStrategy
 from .macd_strategy import MACDStrategy
 from .multi_timeframe_strategy import MultiTimeframeStrategy
+from .long_term_macd_strategy import LongTermMACDStrategy
 
-__all__ = ['DualMAStrategy', 'MACrossRSI', 'BollingerBandStrategy', 'MACDStrategy', 'MultiTimeframeStrategy']
+__all__ = ['DualMAStrategy', 'MACrossRSI', 'BollingerBandStrategy', 'MACDStrategy', 'MultiTimeframeStrategy', 'LongTermMACDStrategy']
