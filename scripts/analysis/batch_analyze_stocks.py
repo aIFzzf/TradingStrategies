@@ -11,9 +11,14 @@ import argparse
 import concurrent.futures
 from datetime import datetime
 from tqdm import tqdm
+import sys
+
+# 添加项目根目录到系统路径
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 from strategies import LongTermMACDStrategy
 from backtest_engine import get_stock_data, run_backtest
-from get_nasdaq_top100 import get_nasdaq100_symbols, load_symbols_from_file
+from scripts.analysis.get_nasdaq_top100 import get_nasdaq100_symbols, load_symbols_from_file
 
 
 def parse_args():
