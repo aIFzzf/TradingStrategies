@@ -33,12 +33,6 @@ jobs:
         
       - name: 分析股票
         run: python scripts/analysis/batch_analyze_stocks.py --signal_only --output data/csv/nasdaq100_analysis.csv
-        
-      - name: 保存分析结果
-        uses: actions/upload-artifact@v4
-        with:
-          name: analysis-results
-          path: data/csv/nasdaq100_analysis.csv
           
       - name: 提交分析结果到仓库
         run: |
