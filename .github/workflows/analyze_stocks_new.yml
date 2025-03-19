@@ -38,6 +38,21 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions@github.com"
-          git add data/csv/nasdaq100_analysis.csv data/json/nasdaq100_symbols.json
+          
+          # 确保json文件存在
+          if [ -f "data/json/nasdaq100_symbols.json" ]; then
+            git add data/json/nasdaq100_symbols.json
+          fi
+          
+          # 确保csv文件存在
+          if [ -f "data/csv/nasdaq100_analysis.csv" ]; then
+            git add data/csv/nasdaq100_analysis.csv
+          else
+            # 如果分析结果为空，创建一个空文件
+            echo "日期,股票代码,股票名称,当前价格,信号类型,信号强度,备注" > data/csv/nasdaq100_analysis.csv
+            echo "$(date +'%Y-%m-%d'),N/A,N/A,0,无信号,0,当前没有符合条件的股票" >> data/csv/nasdaq100_analysis.csv
+            git add data/csv/nasdaq100_analysis.csv
+          fi
+          
           git commit -m "更新股票分析结果 $(date +'%Y-%m-%d')" || echo "没有变更需要提交"
           git push || echo "推送失败，可能是权限问题"
