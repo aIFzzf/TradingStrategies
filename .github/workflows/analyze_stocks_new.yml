@@ -1,9 +1,9 @@
-name: 分析纳斯达克前100股票（新）
+name: 每日检测上涨大趋势股票
 
 on:
   schedule:
-    # 每周一早上8点运行（UTC时间，对应北京时间周一16点）
-    - cron: '0 8 * * 1'
+    # 每天早上8点运行（UTC时间，对应北京时间16点）
+    - cron: '0 8 * * *'
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -31,8 +31,8 @@ jobs:
       - name: 获取纳斯达克前100股票
         run: python scripts/analysis/get_nasdaq_top100.py
         
-      - name: 分析股票
-        run: python scripts/analysis/batch_analyze_stocks.py --signal_only --output data/csv/nasdaq100_analysis.csv
+      - name: 检测上涨大趋势股票
+        run: python scripts/analysis/batch_analyze_stocks.py --uptrend_only --output data/csv/nasdaq100_uptrend_$(date +'%Y-%m-%d').csv
           
       - name: 提交分析结果到仓库
         run: |
@@ -44,15 +44,19 @@ jobs:
             git add data/json/nasdaq100_symbols.json
           fi
           
+          # 获取今天的日期
+          TODAY=$(date +'%Y-%m-%d')
+          CSV_FILE="data/csv/nasdaq100_uptrend_${TODAY}.csv"
+          
           # 确保csv文件存在
-          if [ -f "data/csv/nasdaq100_analysis.csv" ]; then
-            git add data/csv/nasdaq100_analysis.csv
+          if [ -f "$CSV_FILE" ]; then
+            git add "$CSV_FILE"
           else
             # 如果分析结果为空，创建一个空文件
-            echo "日期,股票代码,股票名称,当前价格,信号类型,信号强度,备注" > data/csv/nasdaq100_analysis.csv
-            echo "$(date +'%Y-%m-%d'),N/A,N/A,0,无信号,0,当前没有符合条件的股票" >> data/csv/nasdaq100_analysis.csv
-            git add data/csv/nasdaq100_analysis.csv
+            echo "日期,股票代码,股票名称,当前价格,买入信号,卖出信号,收益率,上涨趋势,备注" > "$CSV_FILE"
+            echo "${TODAY},N/A,N/A,0,No,No,0,No,当前没有处于上涨大趋势的股票" >> "$CSV_FILE"
+            git add "$CSV_FILE"
           fi
           
-          git commit -m "更新股票分析结果 $(date +'%Y-%m-%d')" || echo "没有变更需要提交"
+          git commit -m "更新上涨大趋势股票分析结果 ${TODAY}" || echo "没有变更需要提交"
           git push || echo "推送失败，可能是权限问题"
