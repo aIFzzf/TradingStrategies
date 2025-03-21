@@ -43,9 +43,7 @@ ehthumbs.db
 Thumbs.db
 
 # 数据文件
-data/csv/*.csv
 data/html/*.html
-*.csv
 *.html
 data_cache/
 *.json
