@@ -46,7 +46,6 @@ Thumbs.db
 data/html/*.html
 *.html
 data_cache/
-*.json
 
 # 日志文件
 logs/
