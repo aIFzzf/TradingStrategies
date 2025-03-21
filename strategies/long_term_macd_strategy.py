@@ -57,7 +57,7 @@ class LongTermMACDStrategy(Strategy):
     take_profit_pct = 0.1
     
     # 仓位管理参数
-    position_size = 1.0     # 默认仓位大小（1.0表示全仓）
+    position_size = 0.9      # 默认仓位大小（1.0表示全仓）
     downtrend_exit_size = 0.5  # 趋势反转时卖出的仓位比例
     
     def init(self):

@@ -16,9 +16,10 @@ import sys
 # 添加项目根目录到系统路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from strategies import LongTermMACDStrategy
-from backtest_engine import get_stock_data, run_backtest
-from scripts.analysis.get_nasdaq_top100 import get_nasdaq100_symbols, load_symbols_from_file
+from strategies.long_term_macd_strategy import LongTermMACDStrategy
+from backtest_engine import Backtest, get_stock_data, run_backtest
+from scripts.analysis.get_nasdaq_top100 import load_symbols_from_file as load_nasdaq100
+from scripts.analysis.get_hstech50 import load_symbols_from_file as load_hstech50
 
 
 def parse_args():
@@ -38,6 +39,8 @@ def parse_args():
                         help='只显示处于上涨大趋势的股票')
     parser.add_argument('--output', type=str, default='nasdaq100_analysis.csv',
                         help='输出文件路径')
+    parser.add_argument('--index', type=str, choices=['nasdaq100', 'hstech50'], default='nasdaq100',
+                        help='要分析的指数，可选：nasdaq100, hstech50')
     
     return parser.parse_args()
 
@@ -176,12 +179,25 @@ def main():
     args = parse_args()
     
     # 加载股票代码
-    if os.path.exists(args.symbols_file):
-        symbols = load_symbols_from_file(args.symbols_file)
-        print(f"已从 {args.symbols_file} 加载 {len(symbols)} 个股票代码")
-    else:
-        symbols = get_nasdaq100_symbols()
-        print(f"已获取 {len(symbols)} 个纳斯达克100成分股")
+    if args.index == 'nasdaq100':
+        if os.path.exists(args.symbols_file):
+            symbols = load_nasdaq100(args.symbols_file)
+            print(f"已从 {args.symbols_file} 加载 {len(symbols)} 个股票代码")
+        else:
+            # 如果没有找到文件，尝试从网络获取
+            from scripts.analysis.get_nasdaq_top100 import get_nasdaq100_symbols
+            symbols = get_nasdaq100_symbols()
+            print(f"已获取 {len(symbols)} 个纳斯达克100成分股")
+    elif args.index == 'hstech50':
+        hstech_file = 'data/json/hstech50_symbols.json'
+        if os.path.exists(hstech_file):
+            symbols = load_hstech50(hstech_file)
+            print(f"已从 {hstech_file} 加载 {len(symbols)} 个股票代码")
+        else:
+            # 如果没有找到文件，尝试从网络获取
+            from scripts.analysis.get_hstech50 import get_hstech50_symbols
+            symbols = get_hstech50_symbols()
+            print(f"已获取 {len(symbols)} 个恒生科技指数成分股")
     
     print(f"开始分析 {len(symbols)} 只股票，从 {args.start_date} 到 {args.end_date}")
     
@@ -191,32 +207,41 @@ def main():
         args.start_date, 
         args.end_date, 
         args.max_workers, 
-        args.signal_only,
+        args.signal_only, 
         args.uptrend_only
     )
     
     # 保存结果
     if results_df is not None and not results_df.empty:
+        # 确保输出目录存在
+        output_dir = os.path.dirname(args.output)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            
+        # 保存到CSV
         results_df.to_csv(args.output, index=False)
         print(f"分析结果已保存到 {args.output}")
         
         # 显示结果摘要
         print("\n分析结果摘要:")
         print(f"总共分析了 {len(symbols)} 只股票")
-        print(f"符合条件的股票数量: {len(results_df)}")
+        print(f"符合条件的股票: {len(results_df)}")
         
-        if args.signal_only:
-            buy_signals = results_df[results_df['Buy Signal'] == 'Yes']
-            print(f"有买入信号的股票数量: {len(buy_signals)}")
-            
-        if args.uptrend_only:
-            uptrend_stocks = results_df[results_df['In Uptrend'] == 'Yes']
-            print(f"处于上涨大趋势的股票数量: {len(uptrend_stocks)}")
+        # 显示买入信号的股票
+        buy_signals = results_df[results_df['Buy Signal'] == 'Yes']
+        if not buy_signals.empty:
+            print(f"\n有买入信号的股票 ({len(buy_signals)}):")
+            for _, row in buy_signals.iterrows():
+                print(f"{row['Symbol']} - {row['Name']} - 价格: {row['Price']:.2f}")
+        
+        # 显示处于上涨大趋势的股票
+        uptrends = results_df[results_df['In Uptrend'] == 'Yes']
+        if not uptrends.empty:
+            print(f"\n处于上涨大趋势的股票 ({len(uptrends)}):")
+            for _, row in uptrends.iterrows():
+                print(f"{row['Symbol']} - {row['Name']} - 价格: {row['Price']:.2f}")
     else:
-        # 创建一个空的DataFrame并保存
-        empty_df = pd.DataFrame(columns=['Date', 'Symbol', 'Name', 'Price', 'Buy Signal', 'Sell Signal', 'Return [%]', 'In Uptrend', 'Notes'])
-        empty_df.to_csv(args.output, index=False)
-        print(f"分析结果为空，已创建空文件 {args.output}")
+        print("没有找到符合条件的股票，未生成分析结果文件")
 
 
 if __name__ == "__main__":
