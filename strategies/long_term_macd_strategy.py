@@ -26,7 +26,6 @@ class LongTermMACDStrategy(Strategy):
     1. 月线KDJ金叉
     2. 月线MACD DIF斜率向上
     3. 周线MACD金叉
-    4. 日线K线向上突破EMA20均线或日线MACD金叉
     
     卖出条件:
     1. 月线MACD值下降
