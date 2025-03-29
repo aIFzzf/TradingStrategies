@@ -20,18 +20,28 @@ TradingStrategies/
 │   ├── __init__.py          # 模块初始化文件
 │   ├── indicators.py        # 技术指标计算工具
 │   └── timeframe_utils.py   # 时间周期转换工具
+├── analysis/             # 分析和报表模块
+│   ├── __init__.py          # 模块初始化文件
+│   ├── report_generator.py  # 报表生成器
+│   └── simple_report.py     # 简化版报表生成器
+├── notification/         # 通知模块
+│   ├── __init__.py          # 模块初始化文件
+│   └── email_notification.py # 邮件通知功能
 ├── scripts/              # 脚本目录
 │   ├── analysis/            # 分析脚本
 │       ├── get_nasdaq_top100.py  # 获取纳斯达克前100股票
 │       └── batch_analyze_stocks.py # 批量分析股票
 ├── .github/              # GitHub相关配置
 │   └── workflows/           # GitHub Actions工作流
-│       └── analyze_stocks.yml  # 自动分析股票工作流
+│       ├── analyze_stocks.yml  # 自动分析股票工作流
+│       └── analyze_stocks_new.yml # 新版自动分析工作流（含报表生成和邮件通知）
+├── reports/              # 报表输出目录
 ├── backtest_engine.py       # 回测引擎
 ├── run_strategy.py          # 运行策略的命令行工具
 ├── run_long_term_strategy.py # 运行长期MACD策略
 ├── run_interactive_chart.py # 运行交互式图表
 ├── custom_data_example.py   # 使用自定义数据的示例
+├── .env.example             # 环境变量示例文件
 └── README.md                # 项目说明文档
 ```
 
@@ -79,6 +89,27 @@ python run_strategy.py --symbol AMZN --start 2020-01-01 --end 2023-12-31 --strat
 
 # 自定义参数
 python run_strategy.py --symbol AAPL --start 2020-01-01 --end 2023-12-31 --strategy dual_ma --fast_ma 5 --slow_ma 20 --stop_loss 0.03 --take_profit 0.08
+
+# 生成策略分析报表
+python run_strategy.py --symbol AAPL --start 2020-01-01 --end 2023-12-31 --strategy dual_ma --generate_report
+
+# 自动生成报表（在回测完成后自动生成相应的报表）
+python run_strategy.py --symbol AAPL --start 2020-01-01 --end 2023-12-31 --strategy dual_ma --auto_report
+
+# 发送邮件通知（需配置.env文件中的邮件设置）
+python run_strategy.py --symbol AAPL --start 2020-01-01 --end 2023-12-31 --strategy dual_ma --auto_report --send_email
+
+# 指定邮件接收者
+python run_strategy.py --symbol AAPL --start 2020-01-01 --end 2023-12-31 --strategy dual_ma --auto_report --send_email --email_recipients "user@example.com"
+
+# 运行指数分析（纳斯达克100）
+python run_strategy.py --strategy index_analysis --index nasdaq100
+
+# 运行指数分析（恒生科技50）
+python run_strategy.py --strategy index_analysis --index hstech50
+
+# 运行所有指数分析并发送邮件通知
+python run_strategy.py --strategy index_analysis --index all --auto_report --send_email
 ```
 
 ### 在代码中使用
@@ -148,17 +179,120 @@ python scripts/analysis/batch_analyze_stocks.py --signal_only --output nasdaq100
 python scripts/analysis/batch_analyze_stocks.py --start 2018-01-01 --end 2023-12-31 --max_workers 10 --signal_only
 ```
 
-### GitHub自动化流水线
+## 报表生成功能
+
+本项目提供了多种报表生成功能，可以生成HTML格式的分析报表，方便查看和分享。
+
+### 策略回测报表
+
+```bash
+# 生成策略回测报表
+python run_strategy.py --symbol AAPL --strategy dual_ma --generate_report
+
+# 自动生成报表（在回测完成后自动生成）
+python run_strategy.py --symbol AAPL --strategy dual_ma --auto_report
+```
+
+### 指数分析报表
+
+```bash
+# 生成纳斯达克100指数分析报表
+python run_strategy.py --strategy index_analysis --index nasdaq100
+
+# 生成恒生科技50指数分析报表
+python run_strategy.py --strategy index_analysis --index hstech50
+
+# 生成所有指数分析报表
+python run_strategy.py --strategy index_analysis --index all
+```
+
+### 策略比较报表
+
+```bash
+# 生成策略比较报表
+python run_strategy.py --symbol AAPL --strategy compare --compare_report
+```
+
+### 使用simple_report.py直接生成报表
+
+```bash
+# 生成策略回测报表
+python analysis/simple_report.py strategy --strategy_name dual_ma --symbol AAPL
+
+# 生成纳斯达克100指数分析报表
+python analysis/simple_report.py nasdaq100
+
+# 生成恒生科技50指数分析报表
+python analysis/simple_report.py hstech50
+
+# 比较多个策略
+python analysis/simple_report.py compare --strategy_names dual_ma,macd,bollinger --symbol AAPL
+```
+
+## 邮件通知功能
+
+本项目支持通过邮件发送分析报表，方便及时获取分析结果。
+
+### 配置邮件设置
+
+在项目根目录创建`.env`文件（参考`.env.example`），配置以下环境变量：
+
+```
+EMAIL_SENDER=your_email@example.com
+EMAIL_PASSWORD=your_email_password_or_app_password
+SMTP_SERVER=smtp.example.com
+SMTP_PORT=465
+EMAIL_RECIPIENTS=recipient1@example.com,recipient2@example.com
+```
+
+### 发送邮件通知
+
+```bash
+# 运行策略并发送邮件通知
+python run_strategy.py --symbol AAPL --strategy dual_ma --auto_report --send_email
+
+# 指定邮件接收者
+python run_strategy.py --symbol AAPL --strategy dual_ma --auto_report --send_email --email_recipients "user@example.com"
+
+# 运行指数分析并发送邮件通知
+python run_strategy.py --strategy index_analysis --index all --auto_report --send_email
+```
+
+### 在代码中使用邮件通知
+
+```python
+from notification import EmailNotifier, send_email_notification
+
+# 方法1：使用EmailNotifier类
+notifier = EmailNotifier()
+notifier.send_email(
+    to_emails=["user@example.com"],
+    subject="策略分析报告",
+    body="请查看附件中的策略分析报告",
+    attachments=["reports/strategy_report.html"]
+)
+
+# 方法2：使用便捷函数
+send_email_notification(
+    to_emails=["user@example.com"],
+    subject="策略分析报告",
+    body="请查看附件中的策略分析报告",
+    attachments=["reports/strategy_report.html"]
+)
+```
+
+## GitHub自动化流水线
 
 本项目配置了GitHub Actions工作流，可以自动化运行股票分析：
 
 1. 每周一自动运行（也可以手动触发）
-2. 获取纳斯达克前100股票
+2. 获取纳斯达克前100股票和恒生科技50指数成分股
 3. 运行策略分析
-4. 保存分析结果
-5. 将结果提交回仓库
+4. 生成分析报表
+5. 发送邮件通知
+6. 将结果提交回仓库
 
-工作流配置文件位于`.github/workflows/analyze_stocks.yml`。
+工作流配置文件位于`.github/workflows/analyze_stocks_new.yml`。
 
 ## 多周期组合策略
 
@@ -199,214 +333,3 @@ python scripts/analysis/batch_analyze_stocks.py --start 2018-01-01 --end 2023-12
 
 1. **先大后小原则**：先分析大周期确定趋势方向，再分析小周期寻找入场点
 2. **周期协调**：确保不同周期之间的指标相互协调，避免相互矛盾
-3. **数据同步**：注意不同周期数据的日期对齐问题
-4. **避免过度拟合**：增加周期虽然可以提供更多信息，但也增加了过度拟合的风险
-
-## 数据周期选项
-
-本框架支持使用不同的时间周期进行回测：
-
-- **日线数据 (1d)**: 默认选项，适合短期到中期的交易策略
-- **周线数据 (1wk)**: 适合中期交易策略，减少噪音
-- **月线数据 (1mo)**: 适合长期投资策略，关注大趋势
-
-可以通过两种方式获取不同周期的数据：
-
-1. **直接获取**: 使用`get_stock_data`函数的`interval`参数
-   ```python
-   # 获取周线数据
-   weekly_data = get_stock_data('AAPL', '2018-01-01', '2023-12-31', interval='1wk')
-   ```
-
-2. **重采样**: 使用公共工具模块中的函数对已有的日线数据进行重采样
-   ```python
-   from common.timeframe_utils import resample_to_weekly, resample_to_monthly, resample_to_timeframe
-   
-   # 将日线数据重采样为周线
-   weekly_data = resample_to_weekly(daily_data)
-   
-   # 将日线数据重采样为月线
-   monthly_data = resample_to_monthly(daily_data)
-   
-   # 使用通用函数重采样为任意周期
-   weekly_data = resample_to_timeframe(daily_data, 'W')  # 周线
-   monthly_data = resample_to_timeframe(daily_data, 'M')  # 月线
-   quarterly_data = resample_to_timeframe(daily_data, 'Q')  # 季线
-   yearly_data = resample_to_timeframe(daily_data, 'Y')  # 年线
-   ```
-
-在命令行中，使用`--interval`参数指定数据周期：
-```bash
-# 使用周线数据运行策略
-python run_strategy.py --symbol AAPL --interval 1wk --strategy dual_ma
-```
-
-## 公共工具模块
-
-项目包含一个`common`模块，提供了各种可复用的工具函数：
-
-### 技术指标计算 (indicators.py)
-
-```python
-from common.indicators import SMA, EMA, RSI, MACD, BollingerBands, ATR, STOCH
-
-# 计算简单移动平均线
-sma = SMA(daily_data, 20)
-
-# 计算指数移动平均线
-ema = EMA(daily_data, 20)
-
-# 计算相对强弱指数
-rsi = RSI(daily_data, 14)
-
-# 计算MACD指标
-dif, dea, macd = MACD(daily_data, 12, 26, 9)
-
-# 计算布林带
-upper, middle, lower = BollingerBands(daily_data, 20, 2)
-
-# 计算真实波动幅度均值
-atr = ATR(daily_data, 14)
-
-# 计算随机指标(KD)
-stoch = STOCH(daily_data, 14, 3, 3)
-```
-
-### 时间周期转换 (timeframe_utils.py)
-
-```python
-from common.timeframe_utils import resample_to_weekly, resample_to_monthly, resample_to_timeframe, map_higher_timeframe_to_daily
-
-# 将日线数据重采样为周线
-weekly_data = resample_to_weekly(daily_data)
-
-# 将日线数据重采样为月线
-monthly_data = resample_to_monthly(daily_data)
-
-# 使用通用函数重采样为任意周期
-weekly_data = resample_to_timeframe(daily_data, 'W')  # 周线
-monthly_data = resample_to_timeframe(daily_data, 'M')  # 月线
-quarterly_data = resample_to_timeframe(daily_data, 'Q')  # 季线
-yearly_data = resample_to_timeframe(daily_data, 'Y')  # 年线
-
-# 将高周期数据映射回日线周期（用于在日线图表上显示高周期指标）
-weekly_sma_daily = map_higher_timeframe_to_daily(weekly_sma, daily_data.index)
-```
-
-## 策略说明
-
-### 1. 双均线策略 (DualMAStrategy)
-
-双均线策略使用快速和慢速移动平均线的交叉点作为交易信号：
-
-- 当快速均线上穿慢速均线时买入
-- 当快速均线下穿慢速均线时卖出
-
-```bash
-python run_strategy.py --symbol AAPL --strategy dual_ma --fast_ma 10 --slow_ma 30
-```
-
-### 2. 均线+RSI策略 (MACrossRSI)
-
-结合均线交叉和RSI指标的策略：
-
-- 当快速均线上穿慢速均线且RSI>50时买入
-- 当快速均线下穿慢速均线或RSI<30时卖出
-
-```bash
-python run_strategy.py --symbol MSFT --strategy ma_rsi --fast_ma 10 --slow_ma 30 --rsi_period 14
-```
-
-### 3. 布林带策略 (BollingerBandStrategy)
-
-基于布林带的策略：
-
-- 当价格突破下轨且RSI<30时买入
-- 当价格突破上轨或RSI>70时卖出
-
-```bash
-python run_strategy.py --symbol GOOG --strategy bollinger --bb_period 20 --bb_std 2.0
-```
-
-### 4. MACD策略 (MACDStrategy)
-
-基于MACD指标的策略：
-
-- 当MACD金叉（DIF上穿DEA）时买入
-- 当MACD死叉（DIF下穿DEA）时卖出
-
-```bash
-python run_strategy.py --symbol TSLA --strategy macd --fast_period 12 --slow_period 26 --signal_period 9
-```
-
-### 5. 长期MACD策略 (LongTermMACDStrategy)
-
-使用月线、周线和日线的MACD指标进行多周期共振分析，寻找长期趋势的买卖点：
-
-- 买入条件：
-  1. 月线KDJ金叉
-  2. 月线MACD DIF斜率向上
-  3. 周线MACD金叉
-  4. 日线K线向上突破EMA20均线或日线MACD金叉
-
-- 卖出条件：
-  1. 月线MACD值下降
-  2. 周线MACD死叉且MACD值<0
-
-```bash
-python run_long_term_strategy.py --symbol AAPL --start 2018-01-01 --end 2023-12-31
-```
-
-**注意**：多周期策略需要使用日线数据作为输入，策略内部会自动将其转换为周线和月线数据。策略使用了`common.timeframe_utils`模块中的工具函数进行时间周期转换。
-
-### 6. 多周期组合策略 (MultiTFStrategy)
-
-多周期组合策略结合了短期和长期均线进行交易决策：
-
-- 买入条件：
-  1. 短期均线上穿长期均线
-  2. 信号均线向上
-  3. 价格位于长期均线之上
-
-- 卖出条件：
-  1. 短期均线下穿长期均线
-  2. 信号均线向下
-  3. 价格位于长期均线之下
-
-```bash
-python run_strategy.py --symbol AAPL --strategy multi_tf_strategy --short_ma 5 --long_ma 20 --signal_ma 10
-```
-
-## 自定义数据
-
-除了使用Yahoo Finance的数据外，本框架还支持使用自定义数据源：
-
-```python
-# 加载自定义CSV数据
-custom_data = pd.read_csv('my_stock_data.csv', index_col='Date', parse_dates=True)
-
-# 确保数据包含必要的列：Open, High, Low, Close, Volume
-required_columns = ['Open', 'High', 'Low', 'Close', 'Volume']
-for col in required_columns:
-    if col not in custom_data.columns:
-        raise ValueError(f"自定义数据缺少必要的列: {col}")
-
-# 运行回测
-stats, bt = run_backtest(custom_data, DualMAStrategy)
-```
-
-示例代码见`custom_data_example.py`。
-
-## 贡献指南
-
-欢迎贡献新的策略或改进现有功能！请遵循以下步骤：
-
-1. Fork本仓库
-2. 创建新分支 (`git checkout -b feature/your-feature`)
-3. 提交更改 (`git commit -m 'Add some feature'`)
-4. 推送到分支 (`git push origin feature/your-feature`)
-5. 创建Pull Request
-
-## 许可证
-
-本项目采用MIT许可证。详情请参阅LICENSE文件。
