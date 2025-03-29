@@ -38,11 +38,35 @@ jobs:
         run: |
           python scripts/analysis/batch_analyze_stocks.py --index hstech50 --output data/analysis/hstech50_analysis.csv
 
+      - name: 生成分析报表
+        run: |
+          python run_strategy.py --strategy index_analysis --index all --auto_report
+
+      - name: 配置邮件发送环境
+        env:
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+        run: |
+          echo "# 邮件通知配置" > .env
+          echo "EMAIL_SENDER=${EMAIL_SENDER}" >> .env
+          echo "EMAIL_PASSWORD=${EMAIL_PASSWORD}" >> .env
+          echo "SMTP_SERVER=${SMTP_SERVER}" >> .env
+          echo "SMTP_PORT=${SMTP_PORT}" >> .env
+          echo "EMAIL_RECIPIENTS=${EMAIL_RECIPIENTS}" >> .env
+
+      - name: 发送分析报表邮件
+        run: |
+          python run_strategy.py --strategy index_analysis --index all --send_email
+
       - name: 提交分析结果
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add data/analysis/nasdaq100_analysis.csv data/analysis/hstech50_analysis.csv
           git add data/json/nasdaq100_symbols.json data/json/hstech50_symbols.json
+          git add reports/nasdaq100_analysis_*.html reports/hstech50_analysis_*.html
           git commit -m "更新股票分析结果 $(date +'%Y-%m-%d')" || echo "没有变更需要提交"
           git push
