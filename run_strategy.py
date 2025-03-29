@@ -6,15 +6,18 @@
 
 import argparse
 import pandas as pd
-from strategies import DualMAStrategy, MACrossRSI, BollingerBandStrategy, MACDStrategy, MultiTimeframeStrategy
+import os
+from strategies import DualMAStrategy, MACrossRSI, BollingerBandStrategy, MACDStrategy, MultiTimeframeStrategy, LongTermMACDStrategy
 from backtest_engine import (
     get_stock_data, 
     run_backtest, 
     optimize_strategy, 
     compare_strategies,
-    plot_equity_curves
+    plot_equity_curves,
+    resample_data
 )
 from common.timeframe_utils import resample_to_timeframe, get_timeframe_data
+from analysis import analyze_strategy_results, compare_strategies as compare_strategy_results, batch_analyze_all_results
 
 def parse_args():
     """解析命令行参数"""
@@ -34,7 +37,7 @@ def parse_args():
                         help='数据周期: 1d(日线), 1wk(周线), 1mo(月线)')
     
     parser.add_argument('--strategy', type=str, default='dual_ma',
-                        choices=['dual_ma', 'ma_rsi', 'bollinger', 'macd', 'multi_tf', 'compare'],
+                        choices=['dual_ma', 'ma_rsi', 'bollinger', 'macd', 'multi_tf', 'long_term_macd', 'compare'],
                         help='要运行的策略类型')
     
     parser.add_argument('--optimize', action='store_true',
@@ -78,6 +81,33 @@ def parse_args():
     
     parser.add_argument('--monthly_ma', type=int, default=6,
                         help='月线均线周期')
+    
+    # 长期MACD策略参数
+    parser.add_argument('--ema_period', type=int, default=20,
+                        help='日线EMA周期')
+    
+    parser.add_argument('--price_range_pct', type=float, default=0.05,
+                        help='筹码集中区域上下浮动百分比')
+    
+    parser.add_argument('--position_size', type=float, default=1.0,
+                        help='仓位大小，范围0.0-1.0，默认1.0表示全仓')
+    
+    parser.add_argument('--downtrend_exit_size', type=float, default=0.5,
+                        help='趋势反转时卖出的仓位比例，范围0.0-1.0，默认0.5表示卖出一半')
+    
+    # 分析报表相关参数
+    parser.add_argument('--generate_report', action='store_true',
+                        help='是否生成分析报表')
+    
+    parser.add_argument('--compare_report', action='store_true',
+                        help='是否生成策略比较报表')
+    
+    parser.add_argument('--batch_analyze', action='store_true',
+                        help='批量分析所有回测结果并生成报表')
+    
+    parser.add_argument('--report_metric', type=str, default='Return [%]',
+                        choices=['Return [%]', 'Max. Drawdown [%]', 'Sharpe Ratio', '# Trades', 'Win Rate [%]'],
+                        help='策略比较报表中使用的指标')
     
     return parser.parse_args()
 
@@ -237,6 +267,8 @@ def run_bollinger_strategy(data, args, optimize=False):
     
     # 绘制回测结果
     bt.plot()
+    
+    return stats, bt
 
 
 def run_macd_strategy(data, args, optimize=False):
@@ -293,6 +325,8 @@ def run_macd_strategy(data, args, optimize=False):
     
     # 绘制回测结果
     bt.plot()
+    
+    return stats, bt
 
 
 def run_multi_tf_strategy(data, args, optimize=False):
@@ -342,6 +376,58 @@ def run_multi_tf_strategy(data, args, optimize=False):
         
         # 绘制回测结果
         bt.plot()
+        
+    return stats, bt
+
+
+def run_long_term_macd_strategy(data, args, optimize=False):
+    """运行长期MACD策略"""
+    # 确保参数名称与策略类中定义的参数名称一致
+    params = {
+        'fast_period': args.fast_period,
+        'slow_period': args.slow_period,
+        'signal_period': args.signal_period,
+        'ema_period': args.ema_period,
+        'price_range_pct': args.price_range_pct,
+        'stop_loss_pct': args.stop_loss,
+        'take_profit_pct': args.take_profit,
+        'position_size': args.position_size,
+        'downtrend_exit_size': args.downtrend_exit_size
+    }
+    
+    print(f"运行长期MACD策略回测，参数: {params}")
+    
+    # 创建策略实例并设置参数
+    strategy = LongTermMACDStrategy
+    strategy.fast_period = args.fast_period
+    strategy.slow_period = args.slow_period
+    strategy.signal_period = args.signal_period
+    strategy.ema_period = args.ema_period
+    strategy.price_range_pct = args.price_range_pct
+    strategy.stop_loss_pct = args.stop_loss
+    strategy.take_profit_pct = args.take_profit
+    strategy.position_size = args.position_size
+    strategy.downtrend_exit_size = args.downtrend_exit_size
+    
+    # 运行回测
+    stats, bt = run_backtest(data, strategy)
+    
+    print("\n回测结果:")
+    print(stats[['Start', 'End', 'Duration', 'Return [%]', 'Max. Drawdown [%]', 
+                 '# Trades', 'Win Rate [%]', 'Sharpe Ratio']])
+    
+    # 绘制回测结果
+    bt.plot(superimpose=False)  # 禁用叠加，以便清晰显示
+    
+    # 确保目录存在
+    os.makedirs('data/csv', exist_ok=True)
+    
+    # 保存回测结果到CSV
+    result_df = pd.DataFrame([stats])
+    result_df.to_csv(f'data/csv/long_term_macd_{args.symbol}_results.csv', index=False)
+    print(f"\n回测结果已保存到 data/csv/long_term_macd_{args.symbol}_results.csv")
+    
+    return stats, bt
 
 
 def run_strategy_comparison(data, args):
@@ -391,6 +477,19 @@ def run_strategy_comparison(data, args):
         'take_profit_pct': args.take_profit
     }
     
+    # 长期MACD策略参数
+    long_term_macd_params = {
+        'fast_period': args.fast_period,
+        'slow_period': args.slow_period,
+        'signal_period': args.signal_period,
+        'ema_period': args.ema_period,
+        'price_range_pct': args.price_range_pct,
+        'stop_loss_pct': args.stop_loss,
+        'take_profit_pct': args.take_profit,
+        'position_size': args.position_size,
+        'downtrend_exit_size': args.downtrend_exit_size
+    }
+    
     # 确保使用日线数据
     daily_data = data
     if args.interval != '1d':
@@ -413,13 +512,19 @@ def run_strategy_comparison(data, args):
     print("运行多周期策略...")
     multi_tf_stats, multi_tf_bt = run_backtest(daily_data, MultiTimeframeStrategy)
     
+    print("运行长期MACD策略...")
+    # 获取月线数据用于长期MACD策略
+    monthly_data = resample_data(data, interval='M')
+    long_term_macd_stats, long_term_macd_bt = run_backtest(monthly_data, LongTermMACDStrategy, **long_term_macd_params)
+    
     # 比较结果
     strategies = {
         '双均线策略': dual_ma_bt,
         'MA+RSI策略': ma_rsi_bt,
         '布林带策略': bollinger_bt,
         'MACD策略': macd_bt,
-        '多周期策略': multi_tf_bt
+        '多周期策略': multi_tf_bt,
+        '长期MACD策略': long_term_macd_bt
     }
     
     # 绘制权益曲线对比
@@ -432,7 +537,8 @@ def run_strategy_comparison(data, args):
         'MA+RSI策略': ma_rsi_stats,
         '布林带策略': bollinger_stats,
         'MACD策略': macd_stats,
-        '多周期策略': multi_tf_stats
+        '多周期策略': multi_tf_stats,
+        '长期MACD策略': long_term_macd_stats
     })
     print(comparison)
 
@@ -448,16 +554,55 @@ def main():
     # 根据策略类型运行相应的策略
     if args.strategy == 'dual_ma':
         run_dual_ma_strategy(data, args, optimize=args.optimize)
+        if args.generate_report:
+            print(f"生成双均线策略分析报表...")
+            report_path = analyze_strategy_results('dual_ma', args.symbol)
+            print(f"报表已生成: {report_path}")
     elif args.strategy == 'ma_rsi':
         run_ma_rsi_strategy(data, args, optimize=args.optimize)
+        if args.generate_report:
+            print(f"生成MA+RSI策略分析报表...")
+            report_path = analyze_strategy_results('ma_rsi', args.symbol)
+            print(f"报表已生成: {report_path}")
     elif args.strategy == 'bollinger':
         run_bollinger_strategy(data, args, optimize=args.optimize)
+        if args.generate_report:
+            print(f"生成布林带策略分析报表...")
+            report_path = analyze_strategy_results('bollinger', args.symbol)
+            print(f"报表已生成: {report_path}")
     elif args.strategy == 'macd':
         run_macd_strategy(data, args, optimize=args.optimize)
+        if args.generate_report:
+            print(f"生成MACD策略分析报表...")
+            report_path = analyze_strategy_results('macd', args.symbol)
+            print(f"报表已生成: {report_path}")
     elif args.strategy == 'multi_tf':
         run_multi_tf_strategy(data, args, optimize=args.optimize)
+        if args.generate_report:
+            print(f"生成多周期策略分析报表...")
+            report_path = analyze_strategy_results('multi_tf', args.symbol)
+            print(f"报表已生成: {report_path}")
+    elif args.strategy == 'long_term_macd':
+        # 对于长期MACD策略，我们使用月线数据
+        monthly_data = resample_data(data, interval='M')
+        run_long_term_macd_strategy(monthly_data, args, optimize=args.optimize)
+        if args.generate_report:
+            print(f"生成长期MACD策略分析报表...")
+            report_path = analyze_strategy_results('long_term_macd', args.symbol)
+            print(f"报表已生成: {report_path}")
     elif args.strategy == 'compare':
         run_strategy_comparison(data, args)
+        if args.compare_report:
+            print(f"生成策略比较报表...")
+            strategies = ['dual_ma', 'ma_rsi', 'bollinger', 'macd', 'multi_tf', 'long_term_macd']
+            report_path = compare_strategy_results(strategies, args.symbol, metric=args.report_metric)
+            print(f"比较报表已生成: {report_path}")
+    
+    # 批量分析所有回测结果
+    if args.batch_analyze:
+        print("批量分析所有回测结果...")
+        report_paths = batch_analyze_all_results()
+        print(f"已生成 {len(report_paths)} 个策略报表")
 
 
 if __name__ == "__main__":
