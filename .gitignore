@@ -60,12 +60,14 @@ temp/
 .coverage
 htmlcov/
 
-# 环境变量文件
+# 环境变量和敏感信息
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+*.pem
+credentials.json
 
 # 其他
 *.bak

@@ -8,6 +8,7 @@ import argparse
 import pandas as pd
 import os
 from datetime import datetime
+from typing import List, Dict, Any, Optional
 from strategies import DualMAStrategy, MACrossRSI, BollingerBandStrategy, MACDStrategy, MultiTimeframeStrategy, LongTermMACDStrategy
 from backtest_engine import (
     get_stock_data, 
@@ -20,107 +21,68 @@ from backtest_engine import (
 from common.timeframe_utils import resample_to_timeframe, get_timeframe_data
 from analysis import analyze_strategy_results, compare_strategies as compare_strategy_results, batch_analyze_all_results
 from analysis.simple_report import generate_nasdaq100_report, generate_hstech50_report
+from notification import EmailNotifier, send_email_notification
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description='运行交易策略回测')
     
-    parser.add_argument('--symbol', type=str, default='AAPL',
-                        help='股票代码，例如 AAPL')
-    
-    parser.add_argument('--start', type=str, default='2020-01-01',
-                        help='开始日期，格式 YYYY-MM-DD')
-    
-    parser.add_argument('--end', type=str, default='2023-12-31',
-                        help='结束日期，格式 YYYY-MM-DD')
-    
-    parser.add_argument('--interval', type=str, default='1d',
-                        choices=['1d', '1wk', '1mo'],
-                        help='数据周期: 1d(日线), 1wk(周线), 1mo(月线)')
-    
-    parser.add_argument('--strategy', type=str, default='dual_ma',
+    # 基本参数
+    parser.add_argument('--strategy', type=str, default='dual_ma', 
                         choices=['dual_ma', 'ma_rsi', 'bollinger', 'macd', 'multi_tf', 'long_term_macd', 'compare', 'index_analysis'],
                         help='要运行的策略类型')
+    parser.add_argument('--symbol', type=str, default='AAPL', help='股票代码')
+    parser.add_argument('--start', type=str, default='2020-01-01', help='回测开始日期')
+    parser.add_argument('--end', type=str, default='2023-12-31', help='回测结束日期')
+    parser.add_argument('--interval', type=str, default='1d', choices=['1d', '1wk', '1mo'], help='数据周期')
     
-    parser.add_argument('--optimize', action='store_true',
-                        help='是否优化策略参数')
+    # 策略优化参数
+    parser.add_argument('--optimize', action='store_true', help='是否优化策略参数')
     
-    parser.add_argument('--fast_ma', type=int, default=10,
-                        help='短期均线周期')
+    # 报表生成参数
+    parser.add_argument('--generate_report', action='store_true', help='是否生成策略分析报表')
+    parser.add_argument('--compare_report', action='store_true', help='是否生成策略比较报表')
+    parser.add_argument('--report_metric', type=str, default='total_return', help='策略比较的指标')
+    parser.add_argument('--batch_analyze', action='store_true', help='是否批量分析所有回测结果')
+    parser.add_argument('--auto_report', action='store_true', help='是否自动生成所有报表')
     
-    parser.add_argument('--slow_ma', type=int, default=30,
-                        help='长期均线周期')
+    # 指数分析参数
+    parser.add_argument('--index', type=str, default='nasdaq100', choices=['nasdaq100', 'hstech50', 'all'], help='要分析的指数类型')
+    parser.add_argument('--index_data_file', type=str, help='指数分析数据文件路径')
     
-    parser.add_argument('--stop_loss', type=float, default=0.05,
-                        help='止损百分比')
+    # 通知参数
+    parser.add_argument('--send_email', action='store_true', help='是否发送邮件通知')
+    parser.add_argument('--email_recipients', type=str, help='邮件接收者，多个邮箱用逗号分隔')
     
-    parser.add_argument('--take_profit', type=float, default=0.1,
-                        help='止盈百分比')
+    # 双均线策略参数
+    parser.add_argument('--fast_ma', type=int, default=10, help='短期均线周期')
+    parser.add_argument('--slow_ma', type=int, default=30, help='长期均线周期')
+    parser.add_argument('--stop_loss', type=float, default=0.05, help='止损百分比')
+    parser.add_argument('--take_profit', type=float, default=0.1, help='止盈百分比')
     
     # 布林带策略参数
-    parser.add_argument('--bb_period', type=int, default=20,
-                        help='布林带周期')
-    
-    parser.add_argument('--bb_std', type=float, default=2.0,
-                        help='布林带标准差倍数')
+    parser.add_argument('--bb_period', type=int, default=20, help='布林带周期')
+    parser.add_argument('--bb_std', type=float, default=2.0, help='布林带标准差倍数')
     
     # MACD策略参数
-    parser.add_argument('--fast_period', type=int, default=12,
-                        help='MACD快线周期')
-    
-    parser.add_argument('--slow_period', type=int, default=26,
-                        help='MACD慢线周期')
-    
-    parser.add_argument('--signal_period', type=int, default=9,
-                        help='MACD信号线周期')
+    parser.add_argument('--fast_period', type=int, default=12, help='MACD快线周期')
+    parser.add_argument('--slow_period', type=int, default=26, help='MACD慢线周期')
+    parser.add_argument('--signal_period', type=int, default=9, help='MACD信号线周期')
     
     # 多周期策略参数
-    parser.add_argument('--weekly_fast_ma', type=int, default=4,
-                        help='周线短期均线周期')
-    
-    parser.add_argument('--weekly_slow_ma', type=int, default=10,
-                        help='周线长期均线周期')
-    
-    parser.add_argument('--monthly_ma', type=int, default=6,
-                        help='月线均线周期')
+    parser.add_argument('--weekly_fast_ma', type=int, default=4, help='周线短期均线周期')
+    parser.add_argument('--weekly_slow_ma', type=int, default=10, help='周线长期均线周期')
+    parser.add_argument('--monthly_ma', type=int, default=6, help='月线均线周期')
     
     # 长期MACD策略参数
-    parser.add_argument('--ema_period', type=int, default=20,
-                        help='日线EMA周期')
-    
-    parser.add_argument('--price_range_pct', type=float, default=0.05,
-                        help='筹码集中区域上下浮动百分比')
-    
-    parser.add_argument('--position_size', type=float, default=1.0,
-                        help='仓位大小，范围0.0-1.0，默认1.0表示全仓')
-    
-    parser.add_argument('--downtrend_exit_size', type=float, default=0.5,
-                        help='趋势反转时卖出的仓位比例，范围0.0-1.0，默认0.5表示卖出一半')
-    
-    # 分析报表相关参数
-    parser.add_argument('--generate_report', action='store_true',
-                        help='是否生成分析报表')
-    
-    parser.add_argument('--compare_report', action='store_true',
-                        help='是否生成策略比较报表')
-    
-    parser.add_argument('--report_metric', type=str, default='Return [%]',
-                        choices=['Return [%]', 'Max. Drawdown [%]', 'Sharpe Ratio', '# Trades', 'Win Rate [%]'],
-                        help='比较报表中使用的主要指标')
-    
-    parser.add_argument('--batch_analyze', action='store_true',
-                        help='是否批量分析所有回测结果')
-    
-    # 指数分析相关参数
-    parser.add_argument('--index', type=str, default='nasdaq100',
-                        choices=['nasdaq100', 'hstech50', 'all'],
-                        help='要分析的指数类型')
-    
-    parser.add_argument('--index_data_file', type=str, default=None,
-                        help='指数分析数据CSV文件路径，如果不指定则使用默认路径')
-    
-    parser.add_argument('--auto_report', action='store_true',
-                        help='是否在每日分析完成后自动生成报表')
+    parser.add_argument('--ema_period', type=int, default=20, help='日线EMA周期')
+    parser.add_argument('--price_range_pct', type=float, default=0.05, help='筹码集中区域上下浮动百分比')
+    parser.add_argument('--position_size', type=float, default=1.0, help='仓位大小，范围0.0-1.0，默认1.0表示全仓')
+    parser.add_argument('--downtrend_exit_size', type=float, default=0.5, help='趋势反转时卖出的仓位比例，范围0.0-1.0，默认0.5表示卖出一半')
     
     return parser.parse_args()
 
@@ -558,18 +520,81 @@ def run_strategy_comparison(data, args):
 
 def run_index_analysis(args):
     """运行指数分析"""
+    report_paths = []
+    
     if args.index == 'nasdaq100':
         print("生成纳斯达克100指数分析报表...")
         report_path = generate_nasdaq100_report()
+        report_paths.append(report_path)
         print(f"报表已生成: {report_path}")
     elif args.index == 'hstech50':
         print("生成恒生科技指数分析报表...")
         report_path = generate_hstech50_report()
+        report_paths.append(report_path)
         print(f"报表已生成: {report_path}")
     elif args.index == 'all':
         print("生成所有指数分析报表...")
         report_paths = [generate_nasdaq100_report(), generate_hstech50_report()]
         print(f"报表已生成: {report_paths}")
+    
+    # 发送邮件通知
+    if args.send_email and report_paths:
+        send_report_email(
+            subject="指数分析报表",
+            report_files=report_paths,
+            recipients=args.email_recipients,
+            report_type="指数分析"
+        )
+    
+    return report_paths
+
+
+def send_report_email(subject: str, report_files: List[str], recipients: Optional[str] = None, report_type: str = "策略分析"):
+    """发送报告邮件"""
+    # 获取收件人列表
+    recipients = recipients or os.environ.get('EMAIL_RECIPIENTS', '')
+    if not recipients:
+        print("未配置邮件接收者，无法发送邮件通知")
+        return False
+    
+    recipients_list = [email.strip() for email in recipients.split(',') if email.strip()]
+    if not recipients_list:
+        print("邮件接收者列表为空，无法发送邮件通知")
+        return False
+    
+    # 创建邮件内容
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    body = f"""
+交易策略系统 - {report_type}报表通知
+
+日期: {current_date}
+
+已生成以下报表:
+"""
+    for report_file in report_files:
+        body += f"- {os.path.basename(report_file)}\n"
+    
+    body += "\n报表文件已作为附件发送，请查收。"
+    
+    # 发送邮件
+    try:
+        notifier = EmailNotifier()
+        success = notifier.send_email(
+            to_emails=recipients_list,
+            subject=f"[交易策略] {subject} - {current_date}",
+            body=body,
+            attachments=report_files
+        )
+        
+        if success:
+            print(f"邮件通知已成功发送至: {', '.join(recipients_list)}")
+        else:
+            print("邮件发送失败，请检查邮件配置")
+        
+        return success
+    except Exception as e:
+        print(f"发送邮件时出错: {str(e)}")
+        return False
 
 
 def main():
@@ -586,35 +611,42 @@ def main():
     data = get_stock_data(args.symbol, args.start, args.end, interval=args.interval)
     
     # 根据策略类型运行相应的策略
+    report_paths = []
+    
     if args.strategy == 'dual_ma':
         run_dual_ma_strategy(data, args, optimize=args.optimize)
         if args.generate_report or args.auto_report:
             print(f"生成双均线策略分析报表...")
             report_path = analyze_strategy_results('dual_ma', args.symbol)
+            report_paths.append(report_path)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'ma_rsi':
         run_ma_rsi_strategy(data, args, optimize=args.optimize)
         if args.generate_report or args.auto_report:
             print(f"生成MA+RSI策略分析报表...")
             report_path = analyze_strategy_results('ma_rsi', args.symbol)
+            report_paths.append(report_path)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'bollinger':
         run_bollinger_strategy(data, args, optimize=args.optimize)
         if args.generate_report or args.auto_report:
             print(f"生成布林带策略分析报表...")
             report_path = analyze_strategy_results('bollinger', args.symbol)
+            report_paths.append(report_path)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'macd':
         run_macd_strategy(data, args, optimize=args.optimize)
         if args.generate_report or args.auto_report:
             print(f"生成MACD策略分析报表...")
             report_path = analyze_strategy_results('macd', args.symbol)
+            report_paths.append(report_path)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'multi_tf':
         run_multi_tf_strategy(data, args, optimize=args.optimize)
         if args.generate_report or args.auto_report:
             print(f"生成多周期策略分析报表...")
             report_path = analyze_strategy_results('multi_tf', args.symbol)
+            report_paths.append(report_path)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'long_term_macd':
         # 对于长期MACD策略，我们使用月线数据
@@ -623,6 +655,7 @@ def main():
         if args.generate_report or args.auto_report:
             print(f"生成长期MACD策略分析报表...")
             report_path = analyze_strategy_results('long_term_macd', args.symbol)
+            report_paths.append(report_path)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'compare':
         run_strategy_comparison(data, args)
@@ -630,17 +663,32 @@ def main():
             print(f"生成策略比较报表...")
             strategies = ['dual_ma', 'ma_rsi', 'bollinger', 'macd', 'multi_tf', 'long_term_macd']
             report_path = compare_strategy_results(strategies, args.symbol, metric=args.report_metric)
+            report_paths.append(report_path)
             print(f"比较报表已生成: {report_path}")
     
     # 批量分析所有回测结果
+    batch_report_paths = []
     if args.batch_analyze or args.auto_report:
         print("批量分析所有回测结果...")
-        report_paths = batch_analyze_all_results()
-        print(f"已生成 {len(report_paths)} 个策略报表")
+        batch_report_paths = batch_analyze_all_results()
+        report_paths.extend(batch_report_paths)
+        print(f"已生成 {len(batch_report_paths)} 个策略报表")
         
     # 如果启用了自动报表生成，同时生成指数分析报表
+    index_report_paths = []
     if args.auto_report:
-        run_index_analysis(args)
+        index_report_paths = run_index_analysis(args)
+        report_paths.extend(index_report_paths)
+    
+    # 发送邮件通知
+    if (args.send_email or args.auto_report) and report_paths:
+        send_report_email(
+            subject="策略分析报表",
+            report_files=report_paths,
+            recipients=args.email_recipients,
+            report_type="策略分析"
+        )
+    
 
 if __name__ == "__main__":
     main()
