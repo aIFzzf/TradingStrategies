@@ -15,14 +15,13 @@ jobs:
       - name: 设置 Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.7'
+          python-version: '3.10'
 
       - name: 安装依赖
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # 确保安装兼容版本的库
-          pip install backtesting==0.3.3
+          pip install backtesting
 
       - name: 创建必要的目录结构
         run: |
