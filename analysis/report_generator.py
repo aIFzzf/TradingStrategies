@@ -52,6 +52,28 @@ class ReportGenerator:
         
         return pd.read_csv(file_path)
     
+    def load_nasdaq100_analysis(self, file_path):
+        """
+        加载纳斯达克100指数成分股分析数据
+        
+        Parameters:
+            file_path (str): 分析数据CSV文件路径
+            
+        Returns:
+            pd.DataFrame: 分析数据
+        """
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"找不到分析数据文件: {file_path}")
+        
+        # 读取CSV文件
+        df = pd.read_csv(file_path)
+        
+        # 转换日期列为日期类型
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'])
+            
+        return df
+    
     def load_all_results(self, strategy_type=None):
         """
         加载指定策略类型的所有回测结果
@@ -345,6 +367,253 @@ class ReportGenerator:
         plt.tight_layout()
         
         return fig
+    
+    def generate_nasdaq100_analysis_report(self, analysis_file_path, output_dir=None):
+        """
+        生成纳斯达克100指数成分股分析报表
+        
+        Parameters:
+            analysis_file_path (str): 分析数据CSV文件路径
+            output_dir (str, optional): 报表输出目录，如果为None则使用默认目录
+            
+        Returns:
+            str: 报告HTML文件路径
+        """
+        if output_dir is None:
+            output_dir = self.output_dir
+            
+        # 确保输出目录存在
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 加载分析数据
+        try:
+            data = self.load_nasdaq100_analysis(analysis_file_path)
+        except Exception as e:
+            print(f"加载分析数据时出错: {str(e)}")
+            return None
+            
+        # 获取最新日期
+        latest_date = data['Date'].max().strftime('%Y-%m-%d')
+        
+        # 计算汇总统计数据
+        summary_stats = {
+            '总股票数': len(data['Symbol'].unique()),
+            '买入信号股票数': len(data[data['Buy Signal'] == 'Yes']),
+            '卖出信号股票数': len(data[data['Sell Signal'] == 'Yes']),
+            '上升趋势股票数': len(data[data['In Uptrend'] == 'Yes']),
+            '平均收益率': data['Return [%]'].mean(),
+            '最高收益率': data['Return [%]'].max(),
+            '最低收益率': data['Return [%]'].min()
+        }
+        
+        # 生成买入信号股票列表
+        buy_signals = data[data['Buy Signal'] == 'Yes'].sort_values('Return [%]', ascending=False)
+        
+        # 生成卖出信号股票列表
+        sell_signals = data[data['Sell Signal'] == 'Yes'].sort_values('Return [%]', ascending=False)
+        
+        # 生成表现最好的股票列表（按收益率排序）
+        top_performers = data.sort_values('Return [%]', ascending=False).head(10)
+        
+        # 生成表现最差的股票列表（按收益率排序）
+        bottom_performers = data.sort_values('Return [%]', ascending=True).head(10)
+        
+        # 生成HTML表格
+        def generate_html_table(df, columns=None):
+            if columns is None:
+                columns = df.columns
+                
+            html = "<table border='1' cellpadding='5' cellspacing='0' style='width:100%;'>\n"
+            
+            # 添加表头
+            html += "  <tr>\n"
+            for col in columns:
+                html += f"    <th>{col}</th>\n"
+            html += "  </tr>\n"
+            
+            # 添加数据行
+            for _, row in df.iterrows():
+                html += "  <tr>\n"
+                for col in columns:
+                    value = row[col]
+                    if isinstance(value, (int, float)) and col == 'Return [%]':
+                        html += f"    <td>{value:.2f}%</td>\n"
+                    else:
+                        html += f"    <td>{value}</td>\n"
+                html += "  </tr>\n"
+            
+            html += "</table>"
+            return html
+            
+        # 生成报告HTML
+        report_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>纳斯达克100指数成分股分析报表 - {latest_date}</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                h1, h2, h3 {{ color: #333; }}
+                table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
+                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                th {{ background-color: #f2f2f2; }}
+                tr:nth-child(even) {{ background-color: #f9f9f9; }}
+                .metric-card {{ 
+                    display: inline-block; 
+                    width: 200px; 
+                    margin: 10px; 
+                    padding: 15px; 
+                    border-radius: 5px; 
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+                    text-align: center;
+                }}
+                .metric-value {{ 
+                    font-size: 24px; 
+                    font-weight: bold; 
+                    margin: 10px 0; 
+                }}
+                .positive {{ color: green; }}
+                .negative {{ color: red; }}
+                .chart-container {{ margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            <h1>纳斯达克100指数成分股分析报表</h1>
+            <p>分析日期: {latest_date}</p>
+            
+            <h2>市场概览</h2>
+            <div class="metrics-container">
+        """
+        
+        # 添加关键指标卡片
+        for name, value in summary_stats.items():
+            style = ""
+            if name == '平均收益率' or name == '最高收益率' or name == '最低收益率':
+                style = "positive" if value > 0 else "negative"
+                value_str = f"{value:.2f}%"
+            else:
+                value_str = str(value)
+                
+            report_html += f"""
+            <div class="metric-card">
+                <h3>{name}</h3>
+                <div class="metric-value {style}">{value_str}</div>
+            </div>
+            """
+            
+        report_html += """
+            </div>
+            
+            <h2>买入信号股票</h2>
+        """
+        
+        if len(buy_signals) > 0:
+            report_html += generate_html_table(buy_signals, ['Symbol', 'Name', 'Price', 'Return [%]', 'In Uptrend', 'Notes'])
+        else:
+            report_html += "<p>当前没有买入信号的股票</p>"
+            
+        report_html += """
+            <h2>卖出信号股票</h2>
+        """
+        
+        if len(sell_signals) > 0:
+            report_html += generate_html_table(sell_signals, ['Symbol', 'Name', 'Price', 'Return [%]', 'In Uptrend', 'Notes'])
+        else:
+            report_html += "<p>当前没有卖出信号的股票</p>"
+            
+        report_html += """
+            <h2>表现最好的10只股票</h2>
+        """
+        
+        report_html += generate_html_table(top_performers, ['Symbol', 'Name', 'Price', 'Return [%]', 'Buy Signal', 'Sell Signal', 'In Uptrend'])
+        
+        report_html += """
+            <h2>表现最差的10只股票</h2>
+        """
+        
+        report_html += generate_html_table(bottom_performers, ['Symbol', 'Name', 'Price', 'Return [%]', 'Buy Signal', 'Sell Signal', 'In Uptrend'])
+        
+        report_html += """
+            <h2>分析结论</h2>
+            <p>
+                基于以上数据，我们可以得出以下结论：
+            </p>
+            <ul>
+        """
+        
+        # 添加分析结论
+        avg_return = summary_stats['平均收益率']
+        buy_signal_count = summary_stats['买入信号股票数']
+        sell_signal_count = summary_stats['卖出信号股票数']
+        uptrend_count = summary_stats['上升趋势股票数']
+        total_stocks = summary_stats['总股票数']
+        
+        if avg_return > 0:
+            report_html += f"<li>纳斯达克100指数成分股的平均收益率为 {avg_return:.2f}%，整体表现良好。</li>"
+        else:
+            report_html += f"<li>纳斯达克100指数成分股的平均收益率为 {avg_return:.2f}%，整体表现不佳。</li>"
+            
+        if buy_signal_count > 0:
+            buy_pct = (buy_signal_count / total_stocks) * 100
+            report_html += f"<li>有 {buy_signal_count} 只股票（占比 {buy_pct:.2f}%）显示买入信号，可考虑适当布局。</li>"
+        else:
+            report_html += "<li>当前没有股票显示买入信号，建议观望等待机会。</li>"
+            
+        if sell_signal_count > 0:
+            sell_pct = (sell_signal_count / total_stocks) * 100
+            report_html += f"<li>有 {sell_signal_count} 只股票（占比 {sell_pct:.2f}%）显示卖出信号，注意控制风险。</li>"
+        
+        uptrend_pct = (uptrend_count / total_stocks) * 100
+        report_html += f"<li>有 {uptrend_count} 只股票（占比 {uptrend_pct:.2f}%）处于上升趋势中。</li>"
+        
+        if uptrend_pct > 50:
+            report_html += "<li>大部分股票处于上升趋势，市场整体向好。</li>"
+        else:
+            report_html += "<li>大部分股票不处于上升趋势，市场可能面临调整。</li>"
+            
+        report_html += """
+            </ul>
+            
+            <h2>投资建议</h2>
+            <p>
+                基于以上分析，我们提出以下投资建议：
+            </p>
+            <ul>
+        """
+        
+        # 添加投资建议
+        if buy_signal_count > sell_signal_count and uptrend_count > total_stocks / 2:
+            report_html += "<li>市场整体向好，可适当增加仓位，重点关注有买入信号且处于上升趋势的股票。</li>"
+        elif buy_signal_count < sell_signal_count and uptrend_count < total_stocks / 2:
+            report_html += "<li>市场整体走弱，建议降低仓位，规避风险。</li>"
+        else:
+            report_html += "<li>市场信号混杂，建议保持中性仓位，选择性布局强势股。</li>"
+            
+        if len(top_performers) > 0:
+            top_symbols = ", ".join(top_performers['Symbol'].head(3).tolist())
+            report_html += f"<li>表现最好的股票（{top_symbols}等）可能存在短期获利回吐压力，建议适当关注。</li>"
+            
+        if len(bottom_performers) > 0:
+            bottom_symbols = ", ".join(bottom_performers['Symbol'].head(3).tolist())
+            report_html += f"<li>表现最差的股票（{bottom_symbols}等）可能存在超跌反弹机会，但需注意基本面风险。</li>"
+            
+        report_html += """
+            </ul>
+        </body>
+        </html>
+        """
+        
+        # 保存报告
+        report_filename = f"nasdaq100_analysis_{latest_date.replace('-', '')}.html"
+        report_path = os.path.join(output_dir, report_filename)
+        
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(report_html)
+            
+        print(f"纳斯达克100指数成分股分析报表已生成并保存到: {report_path}")
+        
+        return report_path
     
     def generate_full_report(self, strategy_name, symbol, start_date=None, end_date=None):
         """
@@ -644,12 +913,34 @@ def batch_analyze_all_results(results_dir='data/csv', output_dir='reports'):
     return generator.batch_generate_reports()
 
 
+def analyze_nasdaq100_data(analysis_file_path, output_dir='reports'):
+    """
+    分析纳斯达克100指数成分股数据并生成报表
+    
+    Parameters:
+        analysis_file_path (str): 分析数据CSV文件路径
+        output_dir (str): 报表输出目录
+        
+    Returns:
+        str: 报告文件路径
+    """
+    # 创建报表生成器
+    generator = ReportGenerator(output_dir=output_dir)
+    
+    # 生成报告
+    return generator.generate_nasdaq100_analysis_report(analysis_file_path, output_dir)
+
+
 if __name__ == "__main__":
     # 示例用法
-    analyze_strategy_results('dual_ma', 'AAPL')
+    # 分析单个策略
+    # analyze_strategy_results('dual_ma', 'AAPL')
     
     # 比较多个策略
-    compare_strategies(['dual_ma', 'macd', 'bollinger'], 'AAPL')
+    # compare_strategies(['dual_ma', 'macd'], 'AAPL')
     
     # 批量分析所有结果
-    batch_analyze_all_results()
+    # batch_analyze_all_results()
+    
+    # 分析纳斯达克100指数成分股数据
+    analyze_nasdaq100_data('data/analysis/nasdaq100_analysis.csv')

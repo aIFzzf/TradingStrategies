@@ -7,6 +7,7 @@
 import argparse
 import pandas as pd
 import os
+from datetime import datetime
 from strategies import DualMAStrategy, MACrossRSI, BollingerBandStrategy, MACDStrategy, MultiTimeframeStrategy, LongTermMACDStrategy
 from backtest_engine import (
     get_stock_data, 
@@ -18,6 +19,7 @@ from backtest_engine import (
 )
 from common.timeframe_utils import resample_to_timeframe, get_timeframe_data
 from analysis import analyze_strategy_results, compare_strategies as compare_strategy_results, batch_analyze_all_results
+from analysis.simple_report import generate_nasdaq100_report, generate_hstech50_report
 
 def parse_args():
     """解析命令行参数"""
@@ -37,7 +39,7 @@ def parse_args():
                         help='数据周期: 1d(日线), 1wk(周线), 1mo(月线)')
     
     parser.add_argument('--strategy', type=str, default='dual_ma',
-                        choices=['dual_ma', 'ma_rsi', 'bollinger', 'macd', 'multi_tf', 'long_term_macd', 'compare'],
+                        choices=['dual_ma', 'ma_rsi', 'bollinger', 'macd', 'multi_tf', 'long_term_macd', 'compare', 'index_analysis'],
                         help='要运行的策略类型')
     
     parser.add_argument('--optimize', action='store_true',
@@ -102,12 +104,23 @@ def parse_args():
     parser.add_argument('--compare_report', action='store_true',
                         help='是否生成策略比较报表')
     
-    parser.add_argument('--batch_analyze', action='store_true',
-                        help='批量分析所有回测结果并生成报表')
-    
     parser.add_argument('--report_metric', type=str, default='Return [%]',
                         choices=['Return [%]', 'Max. Drawdown [%]', 'Sharpe Ratio', '# Trades', 'Win Rate [%]'],
-                        help='策略比较报表中使用的指标')
+                        help='比较报表中使用的主要指标')
+    
+    parser.add_argument('--batch_analyze', action='store_true',
+                        help='是否批量分析所有回测结果')
+    
+    # 指数分析相关参数
+    parser.add_argument('--index', type=str, default='nasdaq100',
+                        choices=['nasdaq100', 'hstech50', 'all'],
+                        help='要分析的指数类型')
+    
+    parser.add_argument('--index_data_file', type=str, default=None,
+                        help='指数分析数据CSV文件路径，如果不指定则使用默认路径')
+    
+    parser.add_argument('--auto_report', action='store_true',
+                        help='是否在每日分析完成后自动生成报表')
     
     return parser.parse_args()
 
@@ -543,9 +556,30 @@ def run_strategy_comparison(data, args):
     print(comparison)
 
 
+def run_index_analysis(args):
+    """运行指数分析"""
+    if args.index == 'nasdaq100':
+        print("生成纳斯达克100指数分析报表...")
+        report_path = generate_nasdaq100_report()
+        print(f"报表已生成: {report_path}")
+    elif args.index == 'hstech50':
+        print("生成恒生科技指数分析报表...")
+        report_path = generate_hstech50_report()
+        print(f"报表已生成: {report_path}")
+    elif args.index == 'all':
+        print("生成所有指数分析报表...")
+        report_paths = [generate_nasdaq100_report(), generate_hstech50_report()]
+        print(f"报表已生成: {report_paths}")
+
+
 def main():
     """主函数"""
     args = parse_args()
+    
+    # 如果是指数分析，直接生成报表
+    if args.strategy == 'index_analysis':
+        run_index_analysis(args)
+        return
     
     # 获取股票数据
     print(f"获取 {args.symbol} 的股票数据，从 {args.start} 到 {args.end}，周期: {args.interval}")
@@ -554,31 +588,31 @@ def main():
     # 根据策略类型运行相应的策略
     if args.strategy == 'dual_ma':
         run_dual_ma_strategy(data, args, optimize=args.optimize)
-        if args.generate_report:
+        if args.generate_report or args.auto_report:
             print(f"生成双均线策略分析报表...")
             report_path = analyze_strategy_results('dual_ma', args.symbol)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'ma_rsi':
         run_ma_rsi_strategy(data, args, optimize=args.optimize)
-        if args.generate_report:
+        if args.generate_report or args.auto_report:
             print(f"生成MA+RSI策略分析报表...")
             report_path = analyze_strategy_results('ma_rsi', args.symbol)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'bollinger':
         run_bollinger_strategy(data, args, optimize=args.optimize)
-        if args.generate_report:
+        if args.generate_report or args.auto_report:
             print(f"生成布林带策略分析报表...")
             report_path = analyze_strategy_results('bollinger', args.symbol)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'macd':
         run_macd_strategy(data, args, optimize=args.optimize)
-        if args.generate_report:
+        if args.generate_report or args.auto_report:
             print(f"生成MACD策略分析报表...")
             report_path = analyze_strategy_results('macd', args.symbol)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'multi_tf':
         run_multi_tf_strategy(data, args, optimize=args.optimize)
-        if args.generate_report:
+        if args.generate_report or args.auto_report:
             print(f"生成多周期策略分析报表...")
             report_path = analyze_strategy_results('multi_tf', args.symbol)
             print(f"报表已生成: {report_path}")
@@ -586,24 +620,27 @@ def main():
         # 对于长期MACD策略，我们使用月线数据
         monthly_data = resample_data(data, interval='M')
         run_long_term_macd_strategy(monthly_data, args, optimize=args.optimize)
-        if args.generate_report:
+        if args.generate_report or args.auto_report:
             print(f"生成长期MACD策略分析报表...")
             report_path = analyze_strategy_results('long_term_macd', args.symbol)
             print(f"报表已生成: {report_path}")
     elif args.strategy == 'compare':
         run_strategy_comparison(data, args)
-        if args.compare_report:
+        if args.compare_report or args.auto_report:
             print(f"生成策略比较报表...")
             strategies = ['dual_ma', 'ma_rsi', 'bollinger', 'macd', 'multi_tf', 'long_term_macd']
             report_path = compare_strategy_results(strategies, args.symbol, metric=args.report_metric)
             print(f"比较报表已生成: {report_path}")
     
     # 批量分析所有回测结果
-    if args.batch_analyze:
+    if args.batch_analyze or args.auto_report:
         print("批量分析所有回测结果...")
         report_paths = batch_analyze_all_results()
         print(f"已生成 {len(report_paths)} 个策略报表")
-
+        
+    # 如果启用了自动报表生成，同时生成指数分析报表
+    if args.auto_report:
+        run_index_analysis(args)
 
 if __name__ == "__main__":
     main()
