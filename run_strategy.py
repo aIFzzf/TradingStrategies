@@ -37,7 +37,7 @@ def parse_args():
                         help='要运行的策略类型')
     parser.add_argument('--symbol', type=str, default='AAPL', help='股票代码')
     parser.add_argument('--start', type=str, default='2020-01-01', help='回测开始日期')
-    parser.add_argument('--end', type=str, default='2023-12-31', help='回测结束日期')
+    parser.add_argument('--end', type=str, default=datetime.now().strftime('%Y-%m-%d'), help='回测结束日期')
     parser.add_argument('--interval', type=str, default='1d', choices=['1d', '1wk', '1mo'], help='数据周期')
     
     # 策略优化参数
