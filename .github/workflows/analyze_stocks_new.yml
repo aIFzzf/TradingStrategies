@@ -64,31 +64,31 @@ jobs:
           # 使用run_strategy.py发送邮件
           python run_strategy.py --strategy index_analysis --index all --send_email
 
-      - name: 提交分析结果
-        run: |
-          # 配置Git
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+      # - name: 提交分析结果
+      #   run: |
+      #     # 配置Git
+      #     git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      #     git config --local user.name "github-actions[bot]"
           
-          # 创建输出目录（如果不存在）
-          mkdir -p data/analysis data/json reports
+      #     # 创建输出目录（如果不存在）
+      #     mkdir -p data/analysis data/json reports
           
-          # 添加分析数据和JSON文件
-          for file in data/analysis/nasdaq100_analysis.csv data/analysis/hstech50_analysis.csv data/json/nasdaq100_symbols.json data/json/hstech50_symbols.json; do
-            if [ -f "$file" ]; then
-              git add "$file"
-            fi
-          done
+      #     # 添加分析数据和JSON文件
+      #     for file in data/analysis/nasdaq100_analysis.csv data/analysis/hstech50_analysis.csv data/json/nasdaq100_symbols.json data/json/hstech50_symbols.json; do
+      #       if [ -f "$file" ]; then
+      #         git add "$file"
+      #       fi
+      #     done
           
-          # 添加所有报表HTML文件
-          find reports -name "*.html" -type f -exec git add {} \;
+      #     # 添加所有报表HTML文件
+      #     find reports -name "*.html" -type f -exec git add {} \;
           
-          # 尝试提交更改
-          if git diff --staged --quiet; then
-            echo "没有变更需要提交"
-          else
-            git commit -m "更新股票分析结果 $(date +'%Y-%m-%d')"
+      #     # 尝试提交更改
+      #     if git diff --staged --quiet; then
+      #       echo "没有变更需要提交"
+      #     else
+      #       git commit -m "更新股票分析结果 $(date +'%Y-%m-%d')"
             
-            # 使用GITHUB_TOKEN推送更改
-            git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
-          fi
+      #       # 使用GITHUB_TOKEN推送更改
+      #       git push https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:${{ github.ref }}
+      #     fi
