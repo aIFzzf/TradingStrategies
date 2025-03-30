@@ -39,6 +39,25 @@ jobs:
           echo '{"symbols": []}' > data/json/nasdaq100_symbols.json
           echo '{"symbols": []}' > data/json/hstech50_symbols.json
 
+      - name: 获取最新股票数据
+        run: |
+          # 获取纳斯达克100指数成分股数据
+          python scripts/analysis/get_nasdaq_top100.py
+          
+          # 获取恒生科技50指数成分股数据
+          python scripts/analysis/get_hstech50.py
+          
+          # 批量分析股票数据
+          python scripts/analysis/batch_analyze_stocks.py --index nasdaq100 --output data/analysis/nasdaq100_analysis.csv
+          python scripts/analysis/batch_analyze_stocks.py --index hstech50 --output data/analysis/hstech50_analysis.csv
+          
+          # 显示分析结果摘要
+          echo "纳斯达克100分析结果:"
+          head -n 5 data/analysis/nasdaq100_analysis.csv
+          
+          echo "恒生科技50分析结果:"
+          head -n 5 data/analysis/hstech50_analysis.csv
+
       - name: 生成分析报表
         run: |
           # 使用run_strategy.py生成报表

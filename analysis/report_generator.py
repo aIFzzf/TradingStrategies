@@ -408,6 +408,8 @@ class ReportGenerator:
         
         # 生成买入信号股票列表
         buy_signals = data[data['Buy Signal'] == 'Yes'].sort_values('Return [%]', ascending=False)
+        print("买入信号股票列表:")
+        print(buy_signals)
         
         # 生成卖出信号股票列表
         sell_signals = data[data['Sell Signal'] == 'Yes'].sort_values('Return [%]', ascending=False)

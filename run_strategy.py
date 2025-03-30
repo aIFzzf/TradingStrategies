@@ -81,7 +81,7 @@ def parse_args():
     # 长期MACD策略参数
     parser.add_argument('--ema_period', type=int, default=20, help='日线EMA周期')
     parser.add_argument('--price_range_pct', type=float, default=0.05, help='筹码集中区域上下浮动百分比')
-    parser.add_argument('--position_size', type=float, default=1.0, help='仓位大小，范围0.0-1.0，默认1.0表示全仓')
+    parser.add_argument('--position_size', type=float, default=0.95, help='仓位大小，范围0.0-1.0，默认1.0表示全仓')
     parser.add_argument('--downtrend_exit_size', type=float, default=0.5, help='趋势反转时卖出的仓位比例，范围0.0-1.0，默认0.5表示卖出一半')
     
     return parser.parse_args()
