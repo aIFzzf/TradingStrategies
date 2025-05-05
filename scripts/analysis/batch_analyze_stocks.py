@@ -21,7 +21,7 @@ from strategies.long_term_macd_strategy import LongTermMACDStrategy
 from strategies.dual_ma_strategy import DualMAStrategy
 from strategies.macd_strategy import MACDStrategy
 from strategies.bollinger_strategy import BollingerBandStrategy
-from strategies.ma_rsi_strategy import MARSIStrategy
+# from strategies.ma_rsi_strategy import MARSIStrategy
 from backtest_engine import Backtest, get_stock_data, run_backtest
 from scripts.analysis.get_nasdaq_top100 import load_symbols_from_file as load_nasdaq100
 from scripts.analysis.get_hstech50 import load_symbols_from_file as load_hstech50
@@ -176,7 +176,7 @@ def main():
         'dual_ma': DualMAStrategy,
         'macd': MACDStrategy,
         'bollinger': BollingerBandStrategy,
-        'ma_rsi': MARSIStrategy
+        # 'ma_rsi': MARSIStrategy
     }
     
     strategy_class = strategy_map.get(args.strategy, LongTermMACDStrategy)
