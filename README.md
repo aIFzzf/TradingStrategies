@@ -168,15 +168,32 @@ python scripts/analysis/get_nasdaq_top100.py
 
 ### 批量分析股票
 
+批量分析股票脚本（`batch_analyze_stocks.py`）支持多种策略，可以对多只股票同时应用不同的交易策略进行分析：
+
 ```bash
-# 分析所有股票
+# 使用默认策略（长期MACD策略）分析所有股票
 python scripts/analysis/batch_analyze_stocks.py --output nasdaq100_analysis.csv
+
+# 使用双均线策略分析
+python scripts/analysis/batch_analyze_stocks.py --strategy dual_ma --output nasdaq100_analysis.csv
+
+# 使用布林带策略分析
+python scripts/analysis/batch_analyze_stocks.py --strategy bollinger --output nasdaq100_analysis.csv
+
+# 使用MACD策略分析
+python scripts/analysis/batch_analyze_stocks.py --strategy macd --output nasdaq100_analysis.csv
+
+# 使用MA+RSI策略分析
+python scripts/analysis/batch_analyze_stocks.py --strategy ma_rsi --output nasdaq100_analysis.csv
 
 # 只输出有买入信号的股票
 python scripts/analysis/batch_analyze_stocks.py --signal_only --output nasdaq100_analysis.csv
 
+# 只输出处于上涨大趋势的股票
+python scripts/analysis/batch_analyze_stocks.py --uptrend_only --output nasdaq100_analysis.csv
+
 # 自定义参数
-python scripts/analysis/batch_analyze_stocks.py --start 2018-01-01 --end 2023-12-31 --max_workers 10 --signal_only
+python scripts/analysis/batch_analyze_stocks.py --start 2018-01-01 --end 2023-12-31 --max_workers 10 --strategy dual_ma --signal_only
 ```
 
 ## 报表生成功能

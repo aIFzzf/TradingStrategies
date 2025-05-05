@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-批量分析股票，应用长期MACD策略
+批量分析股票，支持多种交易策略
 """
 
 import os
@@ -16,7 +16,12 @@ import sys
 # 添加项目根目录到系统路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
+# 导入所有可用策略
 from strategies.long_term_macd_strategy import LongTermMACDStrategy
+from strategies.dual_ma_strategy import DualMAStrategy
+from strategies.macd_strategy import MACDStrategy
+from strategies.bollinger_strategy import BollingerBandStrategy
+from strategies.ma_rsi_strategy import MARSIStrategy
 from backtest_engine import Backtest, get_stock_data, run_backtest
 from scripts.analysis.get_nasdaq_top100 import load_symbols_from_file as load_nasdaq100
 from scripts.analysis.get_hstech50 import load_symbols_from_file as load_hstech50
@@ -24,7 +29,7 @@ from scripts.analysis.get_hstech50 import load_symbols_from_file as load_hstech5
 
 def parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='批量分析股票，应用长期MACD策略')
+    parser = argparse.ArgumentParser(description='批量分析股票，应用交易策略')
     parser.add_argument('--symbols_file', type=str, default='data/json/nasdaq100_symbols.json',
                         help='股票代码文件路径')
     parser.add_argument('--start_date', type=str, default='2020-01-01',
@@ -43,11 +48,14 @@ def parse_args():
                         help='要分析的指数，可选：nasdaq100, hstech50')
     parser.add_argument('--debug_symbol', type=str, default=None,
                         help='只分析指定的单个股票代码，用于调试')
+    parser.add_argument('--strategy', type=str, default='long_term_macd',
+                        choices=['long_term_macd', 'dual_ma', 'macd', 'bollinger', 'ma_rsi'],
+                        help='要使用的策略')
     
     return parser.parse_args()
 
 
-def analyze_stock(symbol, start_date, end_date, signal_only=False, uptrend_only=False):
+def analyze_stock(symbol, start_date, end_date, strategy_class=LongTermMACDStrategy, signal_only=False, uptrend_only=False):
     """
     分析单个股票
     
@@ -55,6 +63,7 @@ def analyze_stock(symbol, start_date, end_date, signal_only=False, uptrend_only=
     - symbol: str, 股票代码
     - start_date: str, 开始日期
     - end_date: str, 结束日期
+    - strategy_class: Strategy类, 要使用的策略类，默认为LongTermMACDStrategy
     - signal_only: bool, 是否只返回有买入信号的股票
     - uptrend_only: bool, 是否只返回处于上涨大趋势的股票
     
@@ -74,8 +83,8 @@ def analyze_stock(symbol, start_date, end_date, signal_only=False, uptrend_only=
             return None
             
 
-        # 创建策略实例
-        strategy = LongTermMACDStrategy 
+        # 使用传入的策略类
+        strategy = strategy_class
 
         # 运行回测获取性能统计数据和策略状态
         stats, bt = run_backtest(data, strategy)
@@ -108,7 +117,7 @@ def analyze_stock(symbol, start_date, end_date, signal_only=False, uptrend_only=
         return None
 
 
-def batch_analyze_stocks(symbols, start_date, end_date, max_workers=5, signal_only=False, uptrend_only=False):
+def batch_analyze_stocks(symbols, start_date, end_date, strategy_class=LongTermMACDStrategy, max_workers=5, signal_only=False, uptrend_only=False):
     """
     批量分析股票
     
@@ -116,6 +125,7 @@ def batch_analyze_stocks(symbols, start_date, end_date, max_workers=5, signal_on
     - symbols: list, 股票代码列表
     - start_date: str, 开始日期
     - end_date: str, 结束日期
+    - strategy_class: Strategy类, 要使用的策略类，默认为LongTermMACDStrategy
     - max_workers: int, 并行处理的最大工作线程数
     - signal_only: bool, 是否只返回有买入信号的股票
     - uptrend_only: bool, 是否只返回处于上涨大趋势的股票
@@ -127,13 +137,10 @@ def batch_analyze_stocks(symbols, start_date, end_date, max_workers=5, signal_on
     
     # 使用线程池并行处理
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # 提交所有任务
-        future_to_symbol = {
-            executor.submit(analyze_stock, symbol, start_date, end_date, signal_only, uptrend_only): symbol 
-            for symbol in symbols
-        }
+        # 创建任务
+        future_to_symbol = {executor.submit(analyze_stock, symbol, start_date, end_date, strategy_class, signal_only, uptrend_only): symbol for symbol in symbols}
         
-        # 使用tqdm显示进度条
+        # 收集结果
         for future in tqdm(concurrent.futures.as_completed(future_to_symbol), total=len(symbols), desc="分析进度"):
             symbol = future_to_symbol[future]
             try:
@@ -162,6 +169,19 @@ def batch_analyze_stocks(symbols, start_date, end_date, max_workers=5, signal_on
 def main():
     """主函数"""
     args = parse_args()
+    
+    # 根据命令行参数选择策略
+    strategy_map = {
+        'long_term_macd': LongTermMACDStrategy,
+        'dual_ma': DualMAStrategy,
+        'macd': MACDStrategy,
+        'bollinger': BollingerBandStrategy,
+        'ma_rsi': MARSIStrategy
+    }
+    
+    strategy_class = strategy_map.get(args.strategy, LongTermMACDStrategy)
+    print(f"使用策略: {args.strategy}")
+    
     
     # 加载股票代码
     if args.index == 'nasdaq100':
@@ -206,7 +226,8 @@ def main():
     results_df = batch_analyze_stocks(
         symbols, 
         args.start_date, 
-        args.end_date, 
+        args.end_date,
+        strategy_class,
         args.max_workers, 
         args.signal_only, 
         args.uptrend_only
