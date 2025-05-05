@@ -49,34 +49,24 @@ jobs:
 
       - name: 分析股票数据
         run: |
-          # 使用不同策略分析纳斯达克100股票
+          # 分析纳斯达克100股票
           echo "开始对纳斯达克100股票进行分析..."
           
-          # 使用长期MACD策略分析（默认）
-          python scripts/analysis/batch_analyze_stocks.py --index nasdaq100 --strategy long_term_macd --output data/analysis/nasdaq100_long_term_macd_analysis.csv
+          # 使用长期MACD策略分析
+          python scripts/analysis/batch_analyze_stocks.py --index nasdaq100 --strategy long_term_macd --output data/analysis/nasdaq100_analysis.csv
           
-          # 使用双均线策略分析
-          python scripts/analysis/batch_analyze_stocks.py --index nasdaq100 --strategy dual_ma --output data/analysis/nasdaq100_dual_ma_analysis.csv
-          
-          # 分析恒生科技50股票
-          echo "开始对恒生科技50股票进行分析..."
+          # 分析恒生科机50股票
+          echo "开始对恒生科机50股票进行分析..."
           
           # 使用长期MACD策略分析
-          python scripts/analysis/batch_analyze_stocks.py --index hstech50 --strategy long_term_macd --output data/analysis/hstech50_long_term_macd_analysis.csv
-          
-          # 合并结果到主分析文件
-          cp data/analysis/nasdaq100_long_term_macd_analysis.csv data/analysis/nasdaq100_analysis.csv
-          cp data/analysis/hstech50_long_term_macd_analysis.csv data/analysis/hstech50_analysis.csv
+          python scripts/analysis/batch_analyze_stocks.py --index hstech50 --strategy long_term_macd --output data/analysis/hstech50_analysis.csv
           
           # 显示分析结果摘要
           echo "纳斯达克100分析结果（长期MACD策略）:"
-          head -n 5 data/analysis/nasdaq100_long_term_macd_analysis.csv
+          head -n 5 data/analysis/nasdaq100_analysis.csv
           
-          echo "纳斯达克100分析结果（双均线策略）:"
-          head -n 5 data/analysis/nasdaq100_dual_ma_analysis.csv
-          
-          echo "恒生科技50分析结果（长期MACD策略）:"
-          head -n 5 data/analysis/hstech50_long_term_macd_analysis.csv
+          echo "恒生科机50分析结果（长期MACD策略）:"
+          head -n 5 data/analysis/hstech50_analysis.csv
 
       - name: 生成分析报表
         run: |
