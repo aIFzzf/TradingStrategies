@@ -367,13 +367,15 @@ def run_long_term_macd_strategy(data, args, optimize=False):
         'stop_loss_pct': args.stop_loss,
         'take_profit_pct': args.take_profit,
         'position_size': args.position_size,
-        'downtrend_exit_size': args.downtrend_exit_size
+        'downtrend_exit_size': args.downtrend_exit_size,
     }
     
     print(f"运行长期MACD策略回测，参数: {params}")
     
-    # 创建策略实例并设置参数
+    # 创建策略实例
     strategy = LongTermMACDStrategy
+    
+    # 为策略类设置参数值
     strategy.fast_period = args.fast_period
     strategy.slow_period = args.slow_period
     strategy.signal_period = args.signal_period
@@ -402,7 +404,10 @@ def run_long_term_macd_strategy(data, args, optimize=False):
     result_df.to_csv(f'data/csv/long_term_macd_{args.symbol}_results.csv', index=False)
     print(f"\n回测结果已保存到 data/csv/long_term_macd_{args.symbol}_results.csv")
     
-    return stats, bt
+    # 获取策略的最终趋势状态
+    
+    current_trend = "uptrend" if strategy.in_uptrend else "downtrend" if strategy.in_downtrend else "notrend"
+    return stats, bt,current_trend
 
 
 def run_strategy_comparison(data, args):
@@ -565,12 +570,12 @@ def send_report_email(subject: str, report_files: List[str], recipients: Optiona
     # 创建邮件内容
     current_date = datetime.now().strftime('%Y-%m-%d')
     body = f"""
-交易策略系统 - {report_type}报表通知
+        交易策略系统 - {report_type}报表通知
 
-日期: {current_date}
+        日期: {current_date}
 
-已生成以下报表:
-"""
+        已生成以下报表:
+        """
     for report_file in report_files:
         body += f"- {os.path.basename(report_file)}\n"
     
@@ -651,7 +656,7 @@ def main():
     elif args.strategy == 'long_term_macd':
         # 对于长期MACD策略，我们使用月线数据
         monthly_data = resample_data(data, interval='M')
-        run_long_term_macd_strategy(monthly_data, args, optimize=args.optimize)
+        stats, bt, current_trend = run_long_term_macd_strategy(monthly_data, args, optimize=args.optimize)
         if args.generate_report or args.auto_report:
             print(f"生成长期MACD策略分析报表...")
             report_path = analyze_strategy_results('long_term_macd', args.symbol)

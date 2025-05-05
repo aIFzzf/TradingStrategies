@@ -41,6 +41,8 @@ def parse_args():
                         help='输出文件路径')
     parser.add_argument('--index', type=str, choices=['nasdaq100', 'hstech50'], default='nasdaq100',
                         help='要分析的指数，可选：nasdaq100, hstech50')
+    parser.add_argument('--debug_symbol', type=str, default=None,
+                        help='只分析指定的单个股票代码，用于调试')
     
     return parser.parse_args()
 
@@ -60,6 +62,7 @@ def analyze_stock(symbol, start_date, end_date, signal_only=False, uptrend_only=
     - dict: 分析结果
     """
     try:
+        print(f"开始分析股票 {symbol} hhhhhhhhhhh")
         # 获取股票数据
         data = get_stock_data(symbol, start_date, end_date)
         if data is None or len(data) < 50:  # 确保有足够的数据
@@ -70,8 +73,12 @@ def analyze_stock(symbol, start_date, end_date, signal_only=False, uptrend_only=
         if len(data) < 50:  # 再次确保有足够的数据
             return None
             
+
+        # 创建策略实例
+        strategy = LongTermMACDStrategy 
+
         # 运行回测获取性能统计数据和策略状态
-        stats, bt = run_backtest(data, LongTermMACDStrategy)
+        stats, bt = run_backtest(data, strategy)
         
         # 获取最后一个交易日的信号和趋势状态
         last_date = data.index[-1].strftime('%Y-%m-%d')
@@ -79,30 +86,8 @@ def analyze_stock(symbol, start_date, end_date, signal_only=False, uptrend_only=
         # 检查是否有买入或卖出信号以及是否处于上涨大趋势
         buy_signal = False
         sell_signal = False
-        in_uptrend = False
+        in_uptrend = strategy.in_uptrend
         
-        # 通过查看策略的交易记录来确定最后一个交易日是否有信号
-        if hasattr(bt, 'trades') and bt.trades:
-            last_trade = bt.trades[-1]
-            # 如果最后一笔交易是买入且在最后一个交易日附近
-            if last_trade.size > 0 and abs((last_trade.entry_time - data.index[-1]).days) <= 5:
-                buy_signal = True
-            # 如果最后一笔交易是卖出且在最后一个交易日附近
-            elif last_trade.size < 0 and abs((last_trade.exit_time - data.index[-1]).days) <= 5:
-                sell_signal = True
-        
-        # 通过查看策略输出的日志来确定趋势状态
-        strategy_logs = str(stats)
-        if '上涨大趋势' in strategy_logs:
-            in_uptrend = True
-        
-        # 如果只需要买入信号的股票，且没有买入信号，则返回None
-        if signal_only and not buy_signal:
-            return None
-            
-        # 如果只需要上涨大趋势的股票，且不在上涨大趋势中，则返回None
-        if uptrend_only and not in_uptrend:
-            return None
         
         # 构建结果
         result = {
@@ -198,6 +183,22 @@ def main():
             from scripts.analysis.get_hstech50 import get_hstech50_symbols
             symbols = get_hstech50_symbols()
             print(f"已获取 {len(symbols)} 个恒生科技指数成分股")
+    
+    # 处理debug模式：如果指定了debug_symbol，则只分析该股票
+    if args.debug_symbol:
+        debug_symbol = args.debug_symbol.upper()
+        # 检查是否在已加载的股票列表中
+        symbols_upper = [s.upper() for s in symbols]
+        if debug_symbol in symbols_upper:
+            # 找到原始大小写形式
+            idx = symbols_upper.index(debug_symbol)
+            original_symbol = symbols[idx]
+            symbols = [original_symbol]
+            print(f"*** 调试模式：只分析股票 {original_symbol} ***")
+        else:
+            print(f"警告：调试股票代码 {args.debug_symbol} 不在当前指数成分股列表中。")
+            print(f"将直接使用该代码进行分析。")
+            symbols = [args.debug_symbol]
     
     print(f"开始分析 {len(symbols)} 只股票，从 {args.start_date} 到 {args.end_date}")
     

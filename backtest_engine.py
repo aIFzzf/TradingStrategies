@@ -192,7 +192,6 @@ if __name__ == "__main__":
     
     # 示例：运行双均线策略回测
     stats, bt = run_backtest(data, DualMAStrategy)
-    print(stats)
     bt.plot()
     
     # 示例：比较不同策略

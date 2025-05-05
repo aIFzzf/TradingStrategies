@@ -59,6 +59,11 @@ class LongTermMACDStrategy(Strategy):
     position_size = 0.9      # 默认仓位大小（1.0表示全仓）
     downtrend_exit_size = 0.5  # 趋势反转时卖出的仓位比例
     
+    # 上升下降大趋势
+    in_uptrend = False
+    in_downtrend = False
+
+    
     def init(self):
         """初始化策略，计算指标"""
         # 使用当前数据计算指标（如果是月线，则直接使用）
