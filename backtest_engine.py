@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import requests
 from backtesting import Backtest
 from common.timeframe_utils import resample_to_timeframe
 from strategies import DualMAStrategy, MACrossRSI
@@ -55,7 +56,11 @@ def get_stock_data(symbol, start_date, end_date, interval='1d', max_retries=3, r
     for attempt in range(max_retries):
         try:
             print(f"从Yahoo Finance获取 {symbol} 的数据...")
-            data = yf.download(symbol, start=start_date, end=end_date, interval=interval)
+            # 创建自定义session避免impersonate参数问题
+            session = requests.Session()
+            session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            # 使用自定义session下载数据
+            data = yf.download(symbol, start=start_date, end=end_date, interval=interval, session=session)
             
             if data.empty:
                 if attempt < max_retries - 1:
@@ -113,7 +118,16 @@ def run_backtest(data, strategy_class, **strategy_params):
     返回:
     - tuple: (stats, bt) 回测统计结果和回测对象
     """
-    bt = Backtest(data, strategy_class, cash=10000, commission=.002, **strategy_params)
+    # 创建策略类的子类，并设置策略参数作为类变量
+    strategy_with_params = type('StrategyWithParams', (strategy_class,), strategy_params)
+    
+    # 创建回测对象，不将策略参数作为关键字参数传入
+    # 通过环境变量禁用进度条，避免与自定义日志混合
+    import os
+    os.environ["PYTHONIOENCODING"] = "utf-8"  # 确保中文输出正常
+    os.environ["BACKTESTING_SHOW_PROGRESS"] = "0"  # 禁用进度条
+    
+    bt = Backtest(data, strategy_with_params, cash=10000, commission=.002)
     stats = bt.run()
     return stats, bt
 

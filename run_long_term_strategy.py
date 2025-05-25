@@ -40,13 +40,13 @@ def parse_args():
     parser.add_argument('--price_range_pct', type=float, default=0.05,
                         help='筹码集中区域上下浮动百分比')
     
-    parser.add_argument('--stop_loss', type=float, default=0.05,
+    parser.add_argument('--stop_loss', type=float, default=0.1,
                         help='止损百分比')
     
-    parser.add_argument('--take_profit', type=float, default=0.1,
+    parser.add_argument('--take_profit', type=float, default=0.5,
                         help='止盈百分比')
     
-    parser.add_argument('--position_size', type=float, default=1.0,
+    parser.add_argument('--position_size', type=float, default=0.99,
                         help='仓位大小，范围0.0-1.0，默认1.0表示全仓')
     
     parser.add_argument('--downtrend_exit_size', type=float, default=0.5,
@@ -63,8 +63,6 @@ def run_long_term_macd_strategy(args):
     # 获取股票数据（使用缓存功能）
     data = get_stock_data(args.symbol, args.start, args.end, use_cache=True, cache_dir='data_cache')
     
-    # 将数据重采样为月线周期
-    monthly_data = resample_data(data, interval='M')
     
     # 确保参数名称与策略类中定义的参数名称一致
     params = {
@@ -93,13 +91,26 @@ def run_long_term_macd_strategy(args):
     strategy.position_size = args.position_size
     strategy.downtrend_exit_size = args.downtrend_exit_size
     
-    # 运行回测，使用月线数据
-    stats, bt = run_backtest(monthly_data, strategy)
+    # 运行回测，使用日线数据（而不是月线数据）
+    # 这样可以显示日线图表，而策略内部仍然会使用周线和月线数据进行计算
+    stats, bt = run_backtest(data, strategy)
+
+    # stats = bt.optimize(# monthly_dif_rising_weight=range(10, 20, 5),
+    #                     # monthly_kdj_cross_weight=range(0, 20, 10),
+    #                     buy_threshold=range(0, 100, 10),
+    #                     # sell_threshold=range(0, 10, 10),
+    #                     maximize='Return [%]',
+    #                     max_tries=10000)
+
     
     print("\n回测结果:")
     print(stats[['Start', 'End', 'Duration', 'Return [%]', 'Max. Drawdown [%]', 
                  '# Trades', 'Win Rate [%]', 'Sharpe Ratio']])
     
+    # 打印优化后的参数
+    # print("Optimal parameters:", stats._strategy._params)
+    # print(stats)
+
     # 绘制回测结果
     bt.plot(superimpose=False)  # 禁用叠加，以便清晰显示月线
     

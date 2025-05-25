@@ -77,6 +77,9 @@ python run_strategy.py --symbol AAPL --start 2020-01-01 --end 2023-12-31 --strat
 # 运行长期MACD策略
 python run_long_term_strategy.py --symbol AAPL --start 2018-01-01 --end 2023-12-31
 
+# 运行长期MACD策略并指定止损比例
+python run_long_term_strategy.py --symbol AAPL --start 2020-01-01 --end 2025-03-30 --stop_loss 0.05
+
 # 使用不同的时间周期（周线、月线）
 python run_strategy.py --symbol AAPL --start 2018-01-01 --end 2023-12-31 --strategy dual_ma --interval 1wk
 python run_strategy.py --symbol MSFT --start 2015-01-01 --end 2023-12-31 --strategy macd --interval 1mo
@@ -310,6 +313,48 @@ send_email_notification(
 6. 将结果提交回仓库
 
 工作流配置文件位于`.github/workflows/analyze_stocks_new.yml`。
+
+## 长期MACD策略
+
+长期MACD策略是一个基于多周期分析的交易策略，结合了月线MACD、周线KDJ和日线EMA指标，用于捕捉大级别趋势并精确定位交易信号。
+
+### 策略原理
+
+1. **大趋势判断**：使用月线MACD判断市场大趋势方向
+   - 月线MACD > 0：上涨大趋势
+   - 月线MACD <= 0：下跌大趋势
+
+2. **信号确认**：结合周线KDJ和日线EMA指标确认交易信号
+
+3. **评分系统**：基于各指标状态计算总得分
+   - 月线MACD > 0.1: +10分，否则-10分
+   - 周线KDJ金叉: +20分，否则-20分
+   - 日线EMA上穿: +10分，否则-10分
+   - 总分超过20分时产生买入信号
+   - 总分低于0分时产生卖出信号
+
+4. **风险控制**：内置止损和止盈机制，保护资金安全
+
+### 最新改进
+
+1. **大趋势判断优化**：使用月线MACD值直接判断大趋势，替代原来的得分系统判断
+
+2. **信号跟踪功能**：增加了buy_signal和sell_signal标记，方便跟踪交易状态
+
+3. **日志优化**：增强了日志记录，包含大趋势变化、交易信号和具体价格
+
+### 使用方法
+
+```bash
+# 运行长期MACD策略
+python run_long_term_strategy.py --symbol AAPL --start 2018-01-01 --end 2023-12-31
+
+# 运行长期MACD策略并指定止损比例
+python run_long_term_strategy.py --symbol AAPL --start 2020-01-01 --end 2025-03-30 --stop_loss 0.05
+
+# 运行长期MACD策略并自动生成报表
+python run_long_term_strategy.py --symbol AAPL --start 2020-01-01 --end 2025-03-30 --auto_report
+```
 
 ## 多周期组合策略
 
