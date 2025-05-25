@@ -93,11 +93,12 @@ def analyze_stock(symbol, start_date, end_date, strategy_class=LongTermMACDStrat
         last_date = data.index[-1].strftime('%Y-%m-%d')
         
         # 检查是否有买入或卖出信号以及是否处于上涨大趋势
-        buy_signal = strategy.buy_signal
-        sell_signal = strategy.sell_signal
-        in_uptrend = strategy.in_uptrend
-        
-        
+
+
+        buy_signal = stats._strategy.buy_signal
+        sell_signal = stats._strategy.sell_signal
+        in_uptrend = stats._strategy.in_uptrend
+
         # 构建结果
         result = {
             'Date': last_date,
