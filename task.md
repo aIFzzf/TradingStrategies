@@ -61,3 +61,4 @@
 - [ ] Enhance reporting with more visualization options
 - [ ] Add support for other notification channels (e.g., Slack, Telegram)
 - [ ] Develop a web interface for easier interaction
+- [ ] 增加对指数和加密货币的分析

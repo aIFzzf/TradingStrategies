@@ -356,6 +356,61 @@ python run_long_term_strategy.py --symbol AAPL --start 2020-01-01 --end 2025-03-
 python run_long_term_strategy.py --symbol AAPL --start 2020-01-01 --end 2025-03-30 --auto_report
 ```
 
+## 市场指数和加密货币分析
+
+本框架支持分析全球主要市场指数和加密货币，帮助用户把握市场整体趋势。
+
+### 支持的指数和加密货币
+
+- **美国市场**: 标普500指数、道琼斯工业平均指数、纳斯达克综合指数、罗索2000指数、VIX指数
+- **中国市场**: 上证综合指数、深证成份指数、恒生指数、恒生中国企业指数、创业板指数
+- **欧洲市场**: 欧洲斯托克50指数、富时100指数、德国DAX指数、法国CAC40指数
+- **亚太市场**: 日经225指数、韩国KOSPI指数、澳大利亚ASX200指数、印度孟买SENSEX指数
+- **ETF指数**: SPDR标普500ETF、纳斯达克100ETF、罗索2000ETF、新兴市场ETF、中国大型股ETF
+- **加密货币**: 比特币、以太坊、币安币、瑞波币、艾达币、索拉纳、狗狗币、波卡币、柯基狗、Polygon
+
+### 使用方法
+
+1. **获取市场指数和加密货币数据**
+
+```bash
+# 获取美国市场指数数据
+python scripts/analysis/get_market_indices.py --group us --start_date 2023-01-01
+
+# 获取加密货币数据
+python scripts/analysis/get_market_indices.py --group crypto --start_date 2023-01-01
+
+# 获取所有市场指数和加密货币数据
+python scripts/analysis/get_market_indices.py --group all --start_date 2023-01-01
+```
+
+2. **分析市场指数和加密货币**
+
+```bash
+# 使用长期MACD策略分析美国市场指数
+python scripts/analysis/analyze_market_indices.py --group us --strategy long_term_macd --generate_report
+
+# 分析加密货币
+python scripts/analysis/analyze_market_indices.py --group crypto --strategy long_term_macd --generate_report
+
+# 分析所有市场指数和加密货币并发送邮件
+python scripts/analysis/analyze_market_indices.py --group all --strategy long_term_macd --generate_report --send_email --email_recipients "user@example.com"
+```
+
+### 分析报告
+
+市场指数和加密货币分析报告包含以下信息：
+
+- 指数/加密货币名称和代码
+- 当前价格
+- 买入/卖出信号
+- 大趋势状态
+- 回测收益率
+- 月线MACD值
+- 总得分
+
+这些分析结果可以帮助您全面把握市场趋势，为交易决策提供宏观参考。
+
 ## 多周期组合策略
 
 本框架支持使用多个不同周期的数据进行组合分析和交易决策。多周期策略的主要优势：
