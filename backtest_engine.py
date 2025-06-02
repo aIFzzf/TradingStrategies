@@ -61,7 +61,7 @@ def get_stock_data(symbol, start_date, end_date, interval='1d', max_retries=2, r
             # session = requests.Session()
             # session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             # 使用自定义session下载数据
-            data = yf.download(symbol, start=start_date, end=end_date, interval=interval, session=session)
+            data = yf.download(symbol, start=start_date, end=end_date, interval=interval)
             
             if data.empty:
                 if attempt < max_retries - 1:
