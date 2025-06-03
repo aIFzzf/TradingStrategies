@@ -95,7 +95,7 @@ class LongTermMACDStrategy(Strategy):
     take_profit_pct = 0.9
     
     # 仓位参数
-    position_size = 1.0
+    position_size = 0.99
     downtrend_exit_size = 0.5
     
     # 上升下降大趋势
