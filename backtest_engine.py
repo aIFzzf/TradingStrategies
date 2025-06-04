@@ -16,7 +16,7 @@ from strategies import DualMAStrategy, MACrossRSI
 import os
 
 
-def get_stock_data(symbol, start_date, end_date, interval='1d', max_retries=2, retry_delay=2, use_cache=True, cache_dir='data_cache'):
+def get_stock_data(symbol, start_date, end_date, interval='1d', max_retries=3, retry_delay=5, use_cache=True, cache_dir='data_cache'):
     """
     获取股票数据
     
@@ -57,11 +57,9 @@ def get_stock_data(symbol, start_date, end_date, interval='1d', max_retries=2, r
         try:
             print(f"从Yahoo Finance获取 {symbol} 的数据...")
             
-            # 创建自定义session避免impersonate参数问题
-            # session = requests.Session()
-            # session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            # 使用自定义session下载数据
-            data = yf.download(symbol, start=start_date, end=end_date, interval=interval)
+            # 使用Ticker对象获取数据，而不是直接使用download函数
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(start=start_date, end=end_date, interval=interval)
             
             if data.empty:
                 if attempt < max_retries - 1:
