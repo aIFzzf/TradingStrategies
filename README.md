@@ -30,11 +30,18 @@ TradingStrategies/
 ├── scripts/              # 脚本目录
 │   ├── analysis/            # 分析脚本
 │       ├── get_nasdaq_top100.py  # 获取纳斯达克前100股票
-│       └── batch_analyze_stocks.py # 批量分析股票
+│       ├── get_hstech50.py       # 获取恒生科技50成分股
+│       ├── get_market_indices.py # 获取市场指数数据
+│       └── batch_analyze_stocks.py # 批量分析股票和市场指数
 ├── .github/              # GitHub相关配置
 │   └── workflows/           # GitHub Actions工作流
 │       ├── analyze_stocks.yml  # 自动分析股票工作流
 │       └── analyze_stocks_new.yml # 新版自动分析工作流（含报表生成和邮件通知）
+├── data/                 # 数据目录
+│   ├── analysis/            # 分析结果数据（经过策略处理后的结果）
+│   ├── json/               # JSON格式的数据文件
+│   └── indices/            # 指数数据文件
+├── data_cache/           # 原始数据缓存目录（保存获取到的原始股票和指数数据）
 ├── reports/              # 报表输出目录
 ├── backtest_engine.py       # 回测引擎
 ├── run_strategy.py          # 运行策略的命令行工具
@@ -157,46 +164,105 @@ print(stats1)
 bt1.plot()
 ```
 
-## 批量分析股票
+## 批量分析股票和市场指数
 
-本项目提供了批量分析股票的功能，可以自动获取纳斯达克前100的股票并应用交易策略进行分析。
+本项目提供了批量分析股票和市场指数的功能，可以自动获取纳斯达克100、恒生科技50的成分股以及各大市场指数，并应用交易策略进行分析。
 
-### 获取纳斯达克前100股票
+### 获取股票和指数数据
 
 ```bash
+# 获取纳斯达克100指数成分股
 python scripts/analysis/get_nasdaq_top100.py
+
+# 获取恒生科技50指数成分股
+python scripts/analysis/get_hstech50.py
+
+# 获取美国市场主要指数数据
+python scripts/analysis/get_market_indices.py --group us --start_date 2020-01-01
+
+# 获取中国市场主要指数数据
+python scripts/analysis/get_market_indices.py --group china --start_date 2020-01-01
+
+# 获取欧洲市场主要指数数据
+python scripts/analysis/get_market_indices.py --group europe --start_date 2020-01-01
+
+# 获取亚洲市场主要指数数据
+python scripts/analysis/get_market_indices.py --group asia --start_date 2020-01-01
+
+# 获取主要ETF数据
+python scripts/analysis/get_market_indices.py --group etf --start_date 2020-01-01
+
+# 获取加密货币数据
+python scripts/analysis/get_market_indices.py --group crypto --start_date 2020-01-01
+
+# 获取所有市场指数数据
+python scripts/analysis/get_market_indices.py --group all --start_date 2020-01-01
 ```
 
-这将获取纳斯达克100指数的成分股列表，并保存到`nasdaq100_symbols.json`文件中。
+这些命令会获取相应的股票和指数数据，并保存到相应的JSON和CSV文件中。
 
 ### 批量分析股票
 
 批量分析股票脚本（`batch_analyze_stocks.py`）支持多种策略，可以对多只股票同时应用不同的交易策略进行分析：
 
 ```bash
-# 使用默认策略（长期MACD策略）分析所有股票
-python scripts/analysis/batch_analyze_stocks.py --output nasdaq100_analysis.csv
+# 使用默认策略（长期MACD策略）分析纳斯达克100成分股
+python scripts/analysis/batch_analyze_stocks.py --index nasdaq100 --output data/analysis/nasdaq100_analysis.csv
+
+# 使用默认策略分析恒生科技50成分股
+python scripts/analysis/batch_analyze_stocks.py --index hstech50 --output data/analysis/hstech50_analysis.csv
 
 # 使用双均线策略分析
-python scripts/analysis/batch_analyze_stocks.py --strategy dual_ma --output nasdaq100_analysis.csv
+python scripts/analysis/batch_analyze_stocks.py --strategy dual_ma --output data/analysis/nasdaq100_analysis.csv
 
 # 使用布林带策略分析
-python scripts/analysis/batch_analyze_stocks.py --strategy bollinger --output nasdaq100_analysis.csv
+python scripts/analysis/batch_analyze_stocks.py --strategy bollinger --output data/analysis/nasdaq100_analysis.csv
 
 # 使用MACD策略分析
-python scripts/analysis/batch_analyze_stocks.py --strategy macd --output nasdaq100_analysis.csv
+python scripts/analysis/batch_analyze_stocks.py --strategy macd --output data/analysis/nasdaq100_analysis.csv
 
 # 使用MA+RSI策略分析
-python scripts/analysis/batch_analyze_stocks.py --strategy ma_rsi --output nasdaq100_analysis.csv
+python scripts/analysis/batch_analyze_stocks.py --strategy ma_rsi --output data/analysis/nasdaq100_analysis.csv
 
 # 只输出有买入信号的股票
-python scripts/analysis/batch_analyze_stocks.py --signal_only --output nasdaq100_analysis.csv
+python scripts/analysis/batch_analyze_stocks.py --signal_only --output data/analysis/nasdaq100_analysis.csv
 
 # 只输出处于上涨大趋势的股票
-python scripts/analysis/batch_analyze_stocks.py --uptrend_only --output nasdaq100_analysis.csv
+python scripts/analysis/batch_analyze_stocks.py --uptrend_only --output data/analysis/nasdaq100_analysis.csv
 
 # 自定义参数
 python scripts/analysis/batch_analyze_stocks.py --start 2018-01-01 --end 2023-12-31 --max_workers 10 --strategy dual_ma --signal_only
+```
+
+### 批量分析市场指数
+
+```bash
+# 分析美国市场主要指数
+python scripts/analysis/batch_analyze_stocks.py --analyze_indices --index us --strategy long_term_macd
+
+# 分析中国市场主要指数
+python scripts/analysis/batch_analyze_stocks.py --analyze_indices --index china --strategy long_term_macd
+
+# 分析欧洲市场主要指数
+python scripts/analysis/batch_analyze_stocks.py --analyze_indices --index europe --strategy long_term_macd
+
+# 分析亚洲市场主要指数
+python scripts/analysis/batch_analyze_stocks.py --analyze_indices --index asia --strategy long_term_macd
+
+# 分析主要ETF
+python scripts/analysis/batch_analyze_stocks.py --analyze_indices --index etf --strategy long_term_macd
+
+# 分析加密货币
+python scripts/analysis/batch_analyze_stocks.py --analyze_indices --index crypto --strategy long_term_macd
+
+# 分析所有市场指数
+python scripts/analysis/batch_analyze_stocks.py --analyze_indices --index all --strategy long_term_macd
+
+# 只输出有买入信号的指数
+python scripts/analysis/batch_analyze_stocks.py --analyze_indices --index all --signal_only
+
+# 只输出处于上涨趋势的指数
+python scripts/analysis/batch_analyze_stocks.py --analyze_indices --index all --uptrend_only
 ```
 
 ## 报表生成功能
