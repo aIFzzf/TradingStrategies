@@ -284,7 +284,29 @@ def generate_html_table(data, headers=None, columns=None):
     
     # 添加数据行
     for row in data:
-        html += "  <tr>\n"
+        # 检查是否是上涨趋势且有买入信号的股票
+        is_uptrend_with_buy_signal = False
+        buy_signal_idx = -1
+        uptrend_idx = -1
+        
+        if 'Buy Signal' in columns and 'In Uptrend' in columns:
+            buy_signal_idx = columns.index('Buy Signal')
+            uptrend_idx = columns.index('In Uptrend')
+            
+            if buy_signal_idx < len(col_indices) and uptrend_idx < len(col_indices):
+                buy_signal_col_idx = col_indices[buy_signal_idx]
+                uptrend_col_idx = col_indices[uptrend_idx]
+                
+                if (buy_signal_col_idx < len(row) and uptrend_col_idx < len(row) and 
+                    row[buy_signal_col_idx] == 'Yes' and row[uptrend_col_idx] == 'Yes'):
+                    is_uptrend_with_buy_signal = True
+        
+        # 根据条件设置行样式
+        if is_uptrend_with_buy_signal:
+            html += "  <tr style='color: red; font-weight: bold;'>\n"
+        else:
+            html += "  <tr>\n"
+            
         for i, idx in enumerate(col_indices):
             if idx < len(row):
                 value = row[idx]
